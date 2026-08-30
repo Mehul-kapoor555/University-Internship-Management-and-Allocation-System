@@ -1,6 +1,7 @@
 -- ============================================================
 -- Smart University Internship Management System
 -- Full MySQL Schema — v1.0
+-- Author: Mehul Kapoor
 -- ============================================================
 
 SET NAMES utf8mb4;
