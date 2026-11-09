@@ -9,6 +9,10 @@ $error = '';
 $success = '';
 $newUserId = null;
 
+// Keeps whatever was typed when validation fails, so a rejected submission
+// does not throw away the whole form.
+$old = $_POST;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $role      = $_POST['role'] ?? '';
     $email     = trim($_POST['email'] ?? '');
@@ -42,6 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($matricola === '' || $program === '') {
                     throw new Exception('Matricola and program are required for students.');
                 }
+                $dupe = $db->prepare("SELECT id FROM students WHERE matricola = ?");
+                $dupe->execute([$matricola]);
+                if ($dupe->fetch()) {
+                    throw new Exception('That matricola is already registered.');
+                }
                 // Admin-created students are approved immediately (the admin is
                 // vouching for them). Exams/CFU are filled in on the profile page.
                 $db->prepare(
@@ -52,6 +61,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 )->execute([$newUserId, $matricola, $program, $enrollYr, $me['id']]);
 
             } elseif ($role === 'professor') {
+                // Reads `department`, which now belongs to the professor block
+                // ALONE. It used to collide with an identically named coordinator
+                // field: both were present in the DOM at once, hidden blocks are
+                // still submitted, and PHP keeps the LAST value for a repeated
+                // name — so the empty coordinator box silently overwrote whatever
+                // department was typed here, and every professor was rejected for
+                // having no department. The coordinator field is now
+                // `coord_department`, and the JS below disables inactive blocks
+                // so nothing from another role is posted at all.
                 $dept = trim($_POST['department'] ?? '');
                 if ($dept === '') throw new Exception('Department is required for professors.');
                 $db->prepare("INSERT INTO professors (user_id, department) VALUES (?, ?)")
@@ -64,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                    ->execute([$newUserId, $companyName]);
 
             } elseif ($role === 'coordinator') {
-                $dept = trim($_POST['department'] ?? '') ?: 'Computer Science';
+                $dept = trim($_POST['coord_department'] ?? '') ?: 'Computer Science';
                 $db->prepare("INSERT INTO coordinators (user_id, department) VALUES (?, ?)")
                    ->execute([$newUserId, $dept]);
             }
@@ -74,13 +92,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $db->commit();
             $success = 'Account created for ' . htmlspecialchars($firstName . ' ' . $lastName) . '.';
+            $old = [];   // clear the form after a successful create
 
         } catch (Throwable $e) {
             $db->rollBack();
             $error = $e->getMessage();
+            $newUserId = null;
         }
     }
 }
+
+/** Short helper so the form can repopulate itself after a failed submit. */
+function keep(array $old, string $field, string $fallback = ''): string {
+    return htmlspecialchars($old[$field] ?? $fallback);
+}
+
+$selectedRole = $old['role'] ?? 'student';
 
 require '../includes/header.php';
 ?>
@@ -103,47 +130,59 @@ require '../includes/header.php';
     </div>
 <?php endif; ?>
 
-<form method="POST" class="card form-narrow">
+<form method="POST" class="card form-narrow" id="add-user-form">
     <label for="role">Account type</label>
     <select id="role" name="role" required onchange="toggleFields()">
-        <option value="student">Student</option>
-        <option value="professor">Professor</option>
-        <option value="company">Company</option>
-        <option value="coordinator">Coordinator</option>
+        <option value="student"     <?= $selectedRole === 'student'     ? 'selected' : '' ?>>Student</option>
+        <option value="professor"   <?= $selectedRole === 'professor'   ? 'selected' : '' ?>>Professor</option>
+        <option value="company"     <?= $selectedRole === 'company'     ? 'selected' : '' ?>>Company</option>
+        <option value="coordinator" <?= $selectedRole === 'coordinator' ? 'selected' : '' ?>>Coordinator</option>
     </select>
 
-    <label>First name / Contact first name</label>
-    <input type="text" name="first_name" required>
-    <label>Last name / Contact last name</label>
-    <input type="text" name="last_name" required>
-    <label>Email</label>
-    <input type="email" name="email" required>
-    <label>Temporary password</label>
-    <input type="text" name="password" required>
+    <!--
+      The role-specific block sits ABOVE the account fields on purpose. For a
+      company the organisation is the thing being registered and the contact
+      person is secondary, so "Company name" is the first question asked after
+      choosing the role. The same ordering reads naturally for the other roles:
+      identify the subject first, then set up its login.
+    -->
 
     <div id="fields-student" class="role-fields">
-        <label>Matricola</label>
-        <input type="text" name="matricola" placeholder="e.g. 563906">
-        <label>Program</label>
-        <input type="text" name="program" placeholder="e.g. Computer Science">
-        <label>Enrollment year</label>
-        <input type="number" name="enrollment_year" value="<?= date('Y') ?>" min="2000" max="2100">
+        <label for="matricola">Matricola</label>
+        <input type="text" id="matricola" name="matricola" value="<?= keep($old, 'matricola') ?>" placeholder="e.g. 563906">
+        <label for="program">Program</label>
+        <input type="text" id="program" name="program" value="<?= keep($old, 'program') ?>" placeholder="e.g. BSc Computer Science">
+        <label for="enrollment_year">Enrollment year</label>
+        <input type="number" id="enrollment_year" name="enrollment_year"
+               value="<?= keep($old, 'enrollment_year', date('Y')) ?>" min="2000" max="2100">
     </div>
 
     <div id="fields-professor" class="role-fields">
-        <label>Department</label>
-        <input type="text" name="department" placeholder="e.g. MIFT">
+        <label for="department">Department</label>
+        <input type="text" id="department" name="department" value="<?= keep($old, 'department') ?>" placeholder="e.g. MIFT">
     </div>
 
     <div id="fields-company" class="role-fields">
-        <label>Company name</label>
-        <input type="text" name="company_name">
+        <label for="company_name">Company name</label>
+        <input type="text" id="company_name" name="company_name" value="<?= keep($old, 'company_name') ?>">
     </div>
 
     <div id="fields-coordinator" class="role-fields">
-        <label>Department</label>
-        <input type="text" name="department" placeholder="e.g. Computer Science">
+        <label for="coord_department">Department</label>
+        <input type="text" id="coord_department" name="coord_department" value="<?= keep($old, 'coord_department') ?>" placeholder="e.g. Computer Science">
     </div>
+
+    <label for="first_name" id="label-first">First name</label>
+    <input type="text" id="first_name" name="first_name" value="<?= keep($old, 'first_name') ?>" required>
+
+    <label for="last_name" id="label-last">Last name</label>
+    <input type="text" id="last_name" name="last_name" value="<?= keep($old, 'last_name') ?>" required>
+
+    <label for="email" id="label-email">Email</label>
+    <input type="email" id="email" name="email" value="<?= keep($old, 'email') ?>" required>
+
+    <label for="password">Temporary password</label>
+    <input type="text" id="password" name="password" required>
 
     <button type="submit" class="btn btn-primary" style="width:auto;margin-top:16px;">Create account</button>
 </form>
@@ -151,9 +190,26 @@ require '../includes/header.php';
 <script>
 function toggleFields() {
     var role = document.getElementById('role').value;
-    document.querySelectorAll('.role-fields').forEach(function(el){ el.classList.remove('active'); });
-    var target = document.getElementById('fields-' + role);
-    if (target) target.classList.add('active');
+
+    document.querySelectorAll('.role-fields').forEach(function (el) {
+        var isActive = (el.id === 'fields-' + role);
+        el.classList.toggle('active', isActive);
+
+        // Hiding a block with CSS does NOT stop the browser submitting its
+        // inputs. Disabling them does. Without this, fields belonging to other
+        // roles still arrive in $_POST, which is how the department collision
+        // bug was able to happen in the first place.
+        el.querySelectorAll('input, select, textarea').forEach(function (input) {
+            input.disabled = !isActive;
+        });
+    });
+
+    // A company registers an organisation with a contact person attached; the
+    // other roles register an individual. Relabel so the form reads correctly.
+    var isCompany = (role === 'company');
+    document.getElementById('label-first').textContent = isCompany ? 'Contact first name' : 'First name';
+    document.getElementById('label-last').textContent  = isCompany ? 'Contact last name'  : 'Last name';
+    document.getElementById('label-email').textContent = isCompany ? 'Contact email'      : 'Email';
 }
 toggleFields();
 </script>
