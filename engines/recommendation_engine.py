@@ -124,10 +124,9 @@ def is_eligible(student: dict, offer: dict) -> Tuple[bool, Optional[str]]:
        and offer['required_program'].lower() != student['program'].lower():
         return False, f"Program mismatch (needs {offer['required_program']})"
 
-    from datetime import date
-    if offer['application_deadline'] and offer['application_deadline'] < date.today():
-        return False, "Application deadline passed"
-
+    # NOTE: application-deadline gating intentionally removed. In this system the
+    # coordinator controls whether applications are open via the cycle state machine
+    # (APPLICATIONS_OPEN), so a wall-clock deadline is not used as an eligibility gate.
     return True, None
 
 
@@ -218,7 +217,6 @@ def preference_alignment_score(offer: dict) -> float:
       +0.4 if paid
       +0.2 if remote-friendly
       +0.2 for shorter durations (<=4 months)
-      +0.2 for near-term deadlines (<30 days)
     """
     score = 0.0
     if offer['is_paid']:
@@ -227,12 +225,6 @@ def preference_alignment_score(offer: dict) -> float:
         score += 0.2
     if offer['duration_months'] and offer['duration_months'] <= 4:
         score += 0.2
-
-    if offer['application_deadline']:
-        from datetime import date
-        days_left = (offer['application_deadline'] - date.today()).days
-        if 0 <= days_left <= 30:
-            score += 0.2
 
     return min(1.0, score)
 

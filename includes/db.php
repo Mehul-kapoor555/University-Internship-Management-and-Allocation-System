@@ -4,6 +4,8 @@
 // If the app is ever the domain root (localhost/...), set this to ''.
 define('BASE_URL', '/Internship');
 
+require_once __DIR__ . '/functions.php';
+
 $host = 'localhost';
 $dbname = 'internship_system';
 $user = 'root';

@@ -6,6 +6,7 @@ class EngineRunner
         'applicant_ranking'   => 'engines/applicant_ranking_engine.py',
         'matching'            => 'engines/matching_engine.py',
         'stability_verifier'  => 'engines/stability_verifier.py',
+        'supervisor_optimizer'=> 'engines/supervisor_optimizer.py',
     ];
 
     private static function pythonCmd(): string

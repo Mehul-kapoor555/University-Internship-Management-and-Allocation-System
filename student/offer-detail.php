@@ -27,6 +27,28 @@ $stmt->execute([$user['id']]);
 $student = $stmt->fetch();
 $studentId = $student['id'] ?? null;
 
+// Is this offer eligible for this student? An offer is eligible when the
+// recommendation engine wrote a score row for it (same signal the browse page
+// uses to split the eligible / not-eligible lists). If it isn't there, we also
+// pull the stored reason so we can tell the student why they can't apply.
+$isEligible = false;
+$ineligibilityReason = null;
+if ($studentId) {
+    $stmt = $db->prepare(
+        "SELECT 1 FROM recommendation_scores WHERE student_id = ? AND offer_id = ? LIMIT 1"
+    );
+    $stmt->execute([$studentId, $offerId]);
+    $isEligible = (bool)$stmt->fetchColumn();
+
+    if (!$isEligible) {
+        $stmt = $db->prepare(
+            "SELECT reason FROM eligibility WHERE student_id = ? AND offer_id = ? LIMIT 1"
+        );
+        $stmt->execute([$studentId, $offerId]);
+        $ineligibilityReason = $stmt->fetchColumn() ?: null;
+    }
+}
+
 $alreadyApplied = false;
 $existing = null;
 if ($studentId) {
@@ -36,7 +58,7 @@ if ($studentId) {
     $alreadyApplied = (bool)$existing;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $studentId && !$alreadyApplied) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $studentId && !$alreadyApplied && $isEligible) {
     $coverLetter = trim($_POST['cover_letter'] ?? '');
     $stmt = $db->prepare(
         "INSERT INTO applications (student_id, offer_id, cover_letter) VALUES (?, ?, ?)"
@@ -161,7 +183,7 @@ require '../includes/header.php';
             </div>
         <?php endif; ?>
 
-        <?php if ($studentId): ?>
+        <?php if ($studentId && $isEligible): ?>
             <div class="card">
                 <h3>Apply</h3>
                 <?php if ($alreadyApplied): ?>
@@ -173,6 +195,16 @@ require '../includes/header.php';
                         <button type="submit" class="btn btn-primary">Submit application</button>
                     </form>
                 <?php endif; ?>
+            </div>
+        <?php elseif ($studentId && !$isEligible): ?>
+            <div class="card" style="border-left:4px solid var(--clay-red,#dc2626);">
+                <h3>Not eligible</h3>
+                <p style="margin:0;">
+                    You do not currently meet the requirements for this offer, so you cannot apply to it.
+                    <?php if ($ineligibilityReason): ?>
+                        <br><strong>Reason:</strong> <?= htmlspecialchars($ineligibilityReason) ?>
+                    <?php endif; ?>
+                </p>
             </div>
         <?php endif; ?>
     </div>

@@ -265,7 +265,9 @@ function render_ranked_offer($offer, $skills, $gaps, $isEligible = true) {
             <?php endif; ?>
         </div>
 
-        <a href="<?= BASE_URL ?>/student/offer-detail.php?id=<?= $offerId ?>" class="btn btn-secondary">View & apply</a>
+        <a href="<?= BASE_URL ?>/student/offer-detail.php?id=<?= $offerId ?>" class="btn btn-secondary">
+            <?= $isEligible ? 'View &amp; apply' : 'View' ?>
+        </a>
     </div>
     <?php
 }

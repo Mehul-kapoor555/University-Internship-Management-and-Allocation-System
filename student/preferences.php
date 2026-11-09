@@ -10,6 +10,7 @@ $stmt = $db->prepare("SELECT id FROM students WHERE user_id = ?");
 $stmt->execute([$user['id']]);
 $student = $stmt->fetch();
 $studentId = $student['id'] ?? null;
+$cycleId = activeCycleId($db);
 
 $message = '';
 
@@ -19,11 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $stu
     if (is_array($rankedIds)) {
         $db->prepare("DELETE FROM student_preferences WHERE student_id = ?")->execute([$studentId]);
         $ins = $db->prepare(
-            "INSERT INTO student_preferences (student_id, offer_id, `rank`, source)
-             VALUES (?, ?, ?, 'manual')"
+            "INSERT INTO student_preferences (student_id, offer_id, `rank`, cycle_id, source)
+             VALUES (?, ?, ?, ?, 'manual')"
         );
         foreach ($rankedIds as $rank => $offerId) {
-            $ins->execute([$studentId, (int)$offerId, $rank + 1]);
+            $ins->execute([$studentId, (int)$offerId, $rank + 1, $cycleId]);
         }
         $message = 'Preferences saved.';
     }
@@ -45,11 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_recommendations'
     if (!empty($ordered)) {
         $db->prepare("DELETE FROM student_preferences WHERE student_id = ?")->execute([$studentId]);
         $ins = $db->prepare(
-            "INSERT INTO student_preferences (student_id, offer_id, `rank`, source)
-             VALUES (?, ?, ?, 'recommendation')"
+            "INSERT INTO student_preferences (student_id, offer_id, `rank`, cycle_id, source)
+             VALUES (?, ?, ?, ?, 'recommendation')"
         );
         foreach ($ordered as $rank => $row) {
-            $ins->execute([$studentId, (int)$row['offer_id'], $rank + 1]);
+            $ins->execute([$studentId, (int)$row['offer_id'], $rank + 1, $cycleId]);
         }
         $message = 'Preferences loaded from your recommendation ranking. Reorder as needed and save.';
     } else {

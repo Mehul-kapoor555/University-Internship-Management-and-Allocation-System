@@ -15,6 +15,7 @@ $navByRole = [
         ['Browse internships', BASE_URL . '/internships.php', 'internships'],
         ['My preferences', BASE_URL . '/student/preferences.php', 'preferences'],
         ['My applications', BASE_URL . '/applications.php', 'applications'],
+        ['My placement', BASE_URL . '/student/my-placement.php', 'my-placement'],
         ['My profile', BASE_URL . '/profile.php', 'profile'],
     ],
     'professor' => [
@@ -24,6 +25,7 @@ $navByRole = [
         ['Applicants', BASE_URL . '/professor/applicants.php', 'applicants'],
         ['Rank applicants', BASE_URL . '/professor/rank-applicants.php', 'rank-applicants'],
         ['My students', BASE_URL . '/professor/students.php', 'students'],
+        ['Supervised placements', BASE_URL . '/professor/supervised.php', 'supervised'],
         ['My profile', BASE_URL . '/profile.php', 'profile'],
     ],
     'company' => [
@@ -37,13 +39,13 @@ $navByRole = [
     'coordinator' => [
         ['Dashboard', BASE_URL . '/dashboard.php', 'dashboard'],
         ['Cycle control', BASE_URL . '/admin/cycle-control.php', 'cycle-control'],
-        ['Pending registrations', BASE_URL . '/admin/pending-registrations.php', 'pending-registrations'],
-        ['Register user', BASE_URL . '/admin/register-user.php', 'register-user'],
         ['Users', BASE_URL . '/admin/users.php', 'users'],
-        ['Student academics', BASE_URL . '/admin/student-academic.php', 'student-academic'],
-        ['Offers review', BASE_URL . '/admin/offers-review.php', 'offers-review'],
+        ['Offers review', BASE_URL . '/admin/offer-reviews.php', 'offer-reviews'],
         ['Academic cycles', BASE_URL . '/admin/cycles.php', 'cycles'],
         ['Run matching', BASE_URL . '/admin/run-matching.php', 'run-matching'],
+        ['Supervisor assignment', BASE_URL . '/admin/supervisor-assignments.php', 'supervisor-assignments'],
+        ['Internship lifecycle', BASE_URL . '/admin/lifecycle-dashboard.php', 'lifecycle'],
+        ['Email log', BASE_URL . '/admin/email-log.php', 'email-log'],
     ],
 ];
 

@@ -7,6 +7,7 @@ requireRole(['professor']);
 $user = currentUser();
 $activePage = 'applicants';
 $message = '';
+$cycleId = activeCycleId($db);
 
 // Load professor's offers
 $stmt = $db->prepare("
@@ -35,11 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $sel
     if (is_array($rankedIds)) {
         $db->prepare("DELETE FROM offer_rankings WHERE offer_id = ?")->execute([$selectedOfferId]);
         $ins = $db->prepare(
-            "INSERT INTO offer_rankings (offer_id, student_id, `rank`, source)
-             VALUES (?, ?, ?, 'manual')"
+            "INSERT INTO offer_rankings (offer_id, student_id, `rank`, cycle_id, source)
+             VALUES (?, ?, ?, ?, 'manual')"
         );
         foreach ($rankedIds as $rank => $studentId) {
-            $ins->execute([$selectedOfferId, (int)$studentId, $rank + 1]);
+            $ins->execute([$selectedOfferId, (int)$studentId, $rank + 1, $cycleId]);
         }
         $message = 'Ranking saved.';
     }
@@ -66,11 +67,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_algorithm']) && 
     if (!empty($ordered)) {
         $db->prepare("DELETE FROM offer_rankings WHERE offer_id = ?")->execute([$selectedOfferId]);
         $ins = $db->prepare(
-            "INSERT INTO offer_rankings (offer_id, student_id, `rank`, source)
-             VALUES (?, ?, ?, 'recommendation')"
+            "INSERT INTO offer_rankings (offer_id, student_id, `rank`, cycle_id, source)
+             VALUES (?, ?, ?, ?, 'recommendation')"
         );
         foreach ($ordered as $rank => $row) {
-            $ins->execute([$selectedOfferId, (int)$row['student_id'], $rank + 1]);
+            $ins->execute([$selectedOfferId, (int)$row['student_id'], $rank + 1, $cycleId]);
         }
         $message = 'Ranking loaded from the algorithmic applicant scores. Reorder as needed and save.';
     }

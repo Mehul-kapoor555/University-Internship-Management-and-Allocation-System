@@ -20,7 +20,7 @@ return [
             'open_applications' => [
                 'target' => 'APPLICATIONS_OPEN',
                 'label' => 'Open applications',
-                'requires' => ['check_cycle_has_offers', 'check_deadlines_set'],
+                'requires' => ['check_cycle_has_offers'],
                 'on_transition' => 'action_notify_all_applications_open',
             ],
             'cancel' => [

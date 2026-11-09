@@ -1,0 +1,7 @@
+{
+    "name": "mehul/university-internship-system",
+    "description": "Smart University Internship Management System",
+    "require": {
+        "dompdf/dompdf": "^3.0"
+    }
+}

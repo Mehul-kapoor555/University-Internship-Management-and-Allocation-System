@@ -11,6 +11,7 @@
 
 require_once __DIR__ . '/integrity_checker.php';
 require_once __DIR__ . '/engine_runner.php';
+require_once __DIR__ . '/Mailer.php';
 
 class CycleStateMachine
 {
@@ -247,6 +248,16 @@ class CycleStateMachine
                 'You have been matched — accept or reject',
                 'You have been matched with "' . $row['title'] . '". Please respond before the decision deadline.',
                 'action', '/applications.php');
+
+            // Also send a real email through the Mailer (Brevo) adapter. In demo
+            // mode this is recorded in sent_emails and shown on the email log.
+            $body = Mailer::wrap('You have been matched',
+                '<p>Good news — you have been matched with '
+                . '<strong>' . htmlspecialchars($row['title'], ENT_QUOTES) . '</strong>.</p>'
+                . '<p>Please log in and either accept or reject your placement so the '
+                . 'coordinator can finalise the cycle.</p>');
+            Mailer::sendToUser($this->db, (int)$row['user_id'],
+                'You have been matched — please respond', $body, 'match_published');
         }
     }
 
@@ -289,6 +300,17 @@ class CycleStateMachine
                 'Final matching results available',
                 'The cycle "' . $cycle['name'] . '" has concluded. You may now view accepted student matches.',
                 'success', '/dashboard.php');
+        }
+
+        // Spawn one internship-lifecycle instance per accepted placement. The
+        // lifecycle engine takes over from here (agreement -> approvals ->
+        // active -> closure). Idempotent: only placements without an instance
+        // are created, so a manual spawn on the dashboard is harmless too.
+        try {
+            require_once __DIR__ . '/LifecycleStateMachine.php';
+            (new LifecycleStateMachine($this->db))->spawnForCycle((int)$cycle['id']);
+        } catch (Throwable $e) {
+            /* non-fatal: coordinator can spawn manually from the dashboard */
         }
     }
 

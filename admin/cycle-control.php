@@ -55,6 +55,35 @@ $stateDef = $fsm->stateDef($cycle['current_state']);
 $transitions = $fsm->availableTransitions($cycle['current_state']);
 $history = $fsm->transitionHistory((int)$cycle['id']);
 
+/* Decision summary — shown once results are published so the coordinator can
+   see who accepted / rejected / timed out before choosing to run another round
+   or finalise the cycle. */
+$decisionRows = [];
+$decisionCounts = ['accepted' => 0, 'rejected' => 0, 'timed_out' => 0, 'pending' => 0];
+if (in_array($cycle['current_state'],
+        ['RESULTS_PUBLISHED', 'POST_DECISION_INTEGRITY', 'FINAL_PUBLICATION'], true)) {
+    $stmt = $db->prepare("
+        SELECT a.decision, a.decision_at, a.round_number,
+               o.title,
+               CONCAT(u.first_name, ' ', u.last_name) AS student_name,
+               s.matricola
+        FROM allocations a
+        JOIN matching_rounds r   ON r.id = a.round_id
+        JOIN internship_offers o ON o.id = a.offer_id
+        JOIN students s          ON s.id = a.student_id
+        JOIN users u             ON u.id = s.user_id
+        WHERE r.cycle_id = ?
+        ORDER BY a.round_number DESC, a.id DESC
+    ");
+    $stmt->execute([(int)$cycle['id']]);
+    $decisionRows = $stmt->fetchAll();
+    foreach ($decisionRows as $d) {
+        if (isset($decisionCounts[$d['decision']])) {
+            $decisionCounts[$d['decision']]++;
+        }
+    }
+}
+
 require '../includes/header.php';
 ?>
 
@@ -85,6 +114,49 @@ require '../includes/header.php';
         <?php endforeach; ?>
     </div>
 </div>
+
+<!-- Decision summary (post-publication) -->
+<?php if (!empty($decisionRows)): ?>
+    <div class="card">
+        <h2 class="section-heading" style="margin-top:0;">Student decisions</h2>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;">
+            <span class="pill" style="background:#dcfce7;color:#166534;">Accepted: <?= $decisionCounts['accepted'] ?></span>
+            <span class="pill" style="background:#fee2e2;color:#991b1b;">Rejected: <?= $decisionCounts['rejected'] ?></span>
+            <span class="pill" style="background:#f3f4f6;color:#374151;">Timed out: <?= $decisionCounts['timed_out'] ?></span>
+            <span class="pill" style="background:#fef9c3;color:#854d0e;">Pending: <?= $decisionCounts['pending'] ?></span>
+        </div>
+        <?php if ($cycle['current_state'] === 'RESULTS_PUBLISHED' && $decisionCounts['pending'] > 0): ?>
+            <p style="color:var(--slate-light);margin-top:0;">
+                Waiting on <?= $decisionCounts['pending'] ?> student(s). Closing the decision
+                window will mark any remaining pending responses as timed out.
+            </p>
+        <?php endif; ?>
+        <table>
+            <thead>
+                <tr><th>Student</th><th>Offer</th><th>Round</th><th>Decision</th><th>Responded</th></tr>
+            </thead>
+            <tbody>
+            <?php foreach ($decisionRows as $d): ?>
+                <?php
+                    $cls = $d['decision'] === 'accepted' ? 'accepted'
+                         : ($d['decision'] === 'pending' ? 'pending' : 'rejected');
+                    $label = [
+                        'accepted' => 'Accepted', 'rejected' => 'Rejected',
+                        'timed_out' => 'Timed out', 'pending' => 'Pending',
+                    ][$d['decision']] ?? ucfirst($d['decision']);
+                ?>
+                <tr>
+                    <td><?= htmlspecialchars($d['student_name']) ?> <span class="offer-meta">(<?= htmlspecialchars($d['matricola']) ?>)</span></td>
+                    <td><?= htmlspecialchars($d['title']) ?></td>
+                    <td>R<?= (int)$d['round_number'] ?></td>
+                    <td><span class="badge badge-<?= $cls ?>"><?= htmlspecialchars($label) ?></span></td>
+                    <td><?= $d['decision_at'] ? htmlspecialchars(date('d M Y, H:i', strtotime($d['decision_at']))) : '—' ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+<?php endif; ?>
 
 <!-- Available transitions -->
 <?php if (empty($transitions)): ?>
