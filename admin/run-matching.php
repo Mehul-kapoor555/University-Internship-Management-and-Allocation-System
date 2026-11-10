@@ -2,6 +2,7 @@
 require '../includes/db.php';
 require '../includes/auth.php';
 require '../includes/engine_runner.php';
+require_once '../includes/auto_ranking.php';
 requireRole(['coordinator']);
 
 $user = currentUser();
@@ -15,6 +16,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'run') {
         $cycleId = (int)$_POST['cycle_id'];
+
+        // Before matching, give every applicant and every offer a list derived
+        // from the NLP engines, unless a human already ranked by hand. The
+        // matcher reads only student_preferences and offer_rankings, and it
+        // silently omits anyone with no rows, so without this step a student
+        // who never opened the preferences page disappears from the allocation
+        // without any error being raised.
+        $autoSummary = applyRecommendationDefaults($db, $cycleId);
+        $autoNote = ' Ranking defaults: ' . describeRecommendationDefaults($autoSummary);
+        if (!empty($autoSummary['engine_failures'])) {
+            $autoNote .= ' (' . count($autoSummary['engine_failures'])
+                       . ' scoring engine call(s) failed; those fell back to application order.)';
+        }
+
         $result = EngineRunner::run('matching', ['cycle-id' => $cycleId]);
         if ($result['success']) {
             $roundId = $result['data']['round_id'];
@@ -24,9 +39,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $bp = $verifyResult['data']['blocking_pairs_count'];
                 $message = "Matching complete. Round #{$roundId}: " .
                            "{$result['data']['matched_students']}/{$result['data']['total_students']} students matched. " .
-                           "Stability check: " . ($bp === 0 ? "✓ stable (no blocking pairs)" : "✗ {$bp} blocking pairs!");
+                           "Stability check: " . ($bp === 0 ? "✓ stable (no blocking pairs)" : "✗ {$bp} blocking pairs!") .
+                           $autoNote;
             } else {
-                $message = "Matching complete (round #{$roundId}), but verification failed: " . $verifyResult['error'];
+                $message = "Matching complete (round #{$roundId}), but verification failed: "
+                           . $verifyResult['error'] . $autoNote;
             }
         } else {
             $error = 'Matching failed: ' . $result['error'];
@@ -49,17 +66,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db->prepare("UPDATE allocations SET status = 'confirmed' WHERE round_id = ?")
                ->execute([$roundId]);
 
-            // Update offer filled counts
-            $stmt = $db->prepare("
-                SELECT offer_id, COUNT(*) AS n FROM allocations
-                WHERE round_id = ? AND status = 'confirmed'
-                GROUP BY offer_id
-            ");
-            $stmt->execute([$roundId]);
-            $updateFilled = $db->prepare("UPDATE internship_offers SET filled = filled + ? WHERE id = ?");
-            foreach ($stmt->fetchAll() as $row) {
-                $updateFilled->execute([(int)$row['n'], (int)$row['offer_id']]);
-            }
+            // Publishing deliberately does NOT touch internship_offers.filled.
+            //
+            // Publishing announces a match; it does not take a seat. The seat is
+            // taken when the student accepts. This used to add one per matched
+            // student here and the acceptance added one for the same seat again,
+            // so every seat was counted twice and an offer reported itself full
+            // before anybody had responded. `filled` is now derived from the
+            // accepted allocations by recomputeOfferFilled(), so there is
+            // nothing to increment at this point.
+            recomputeOfferFilled($db);
 
             // Mark round as published
             $db->prepare("UPDATE matching_rounds SET status = 'published' WHERE id = ?")

@@ -70,22 +70,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
             $db->beginTransaction();
 
             if ($choice === 'accepted') {
-                // Consume the seat.
                 $db->prepare("
                     UPDATE allocations
                     SET decision = 'accepted', status = 'confirmed', decision_at = NOW()
                     WHERE id = ?
                 ")->execute([$allocationId]);
 
-                $newFilled = (int)$alloc['filled'] + 1;
-                $newStatus = $newFilled >= (int)$alloc['capacity'] ? 'closed' : $alloc['offer_status'];
-                $db->prepare("
-                    UPDATE internship_offers SET filled = ?, status = ? WHERE id = ?
-                ")->execute([$newFilled, $newStatus, (int)$alloc['offer_id']]);
-
                 $decisionMessage = 'You have accepted your placement for "' . $alloc['title'] . '".';
             } else {
-                // Release the tentative match; seat is untouched so it stays open.
                 $db->prepare("
                     UPDATE allocations
                     SET decision = 'rejected', status = 'rejected', decision_at = NOW()
@@ -95,6 +87,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
                 $decisionMessage = 'You have rejected the match for "' . $alloc['title'] . '". '
                                  . 'You will not be considered for this offer again in this cycle.';
             }
+
+            // Recount the seats on this offer from the decisions that now exist,
+            // rather than adjusting a stored counter. Both branches run it: an
+            // acceptance takes a seat, and a rejection has to give one back so a
+            // later round can reuse it. The old code incremented on accept and
+            // did nothing on reject, which leaked a seat on every rejection.
+            recomputeOfferFilled($db, (int)$alloc['offer_id']);
 
             // Let the coordinator see the response land (in-app notification).
             $coordStmt = $db->query("SELECT id FROM users WHERE role = 'coordinator' LIMIT 1");

@@ -10,6 +10,9 @@
  */
 
 require_once __DIR__ . '/integrity_checker.php';
+// For recomputeOfferFilled(). db.php already loads this, but requiring it here
+// too means the class does not silently depend on its caller's include order.
+require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/engine_runner.php';
 require_once __DIR__ . '/Mailer.php';
 
@@ -270,6 +273,12 @@ class CycleStateMachine
             WHERE r.cycle_id = ? AND a.decision = 'pending'
         ");
         $stmt->execute([(int)$cycle['id']]);
+
+        // A student who never answered has not taken their seat, so it must go
+        // back into the pool for the next round. Seat counts are derived from
+        // the accepted allocations, and these rows just stopped being pending
+        // without becoming accepted, so a recount releases them.
+        recomputeOfferFilled($this->db);
     }
 
     private function action_discard_current_round(array $cycle): void
