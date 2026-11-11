@@ -264,20 +264,73 @@ class CycleStateMachine
         }
     }
 
+    /**
+     * Closing the decision window: settle everyone who has not answered.
+     *
+     * DEMO HARNESS — this is deliberate and disclosed, not a shortcut hidden in
+     * the code. The system is demonstrated with more students than can be
+     * logged in and clicked through by hand, and the supervisor assignment that
+     * follows only sees students who ACCEPTED, so leaving everyone undecided
+     * would leave nothing to assign. Instead of timing those students out, each
+     * is given a simulated answer here.
+     *
+     * One roll of 0, 1 or 2 per student: 0 rejects, 1 and 2 accept, so roughly
+     * a third decline. That keeps some seats unfilled, which is what makes the
+     * second matching round meaningful.
+     *
+     * Two rules make this safe:
+     *   - Only allocations still 'pending' are touched. A student who answered
+     *     for themselves keeps their own answer, always.
+     *   - Every simulated row is stamped decision_source = 'simulated', so it
+     *     can be told apart from a real decision wherever decisions are shown.
+     *
+     * It runs on every close of the decision window, so round one and round two
+     * are both settled the same way.
+     */
+    /**
+     * Cancelling a cycle also stands it down.
+     *
+     * is_active and current_state answer different questions — "is this the
+     * cycle the system is running" and "how far has it got" — and a cancelled
+     * cycle should be neither. Leaving is_active set meant a cancelled cycle
+     * still read as Active in the cycles list, and still came back from
+     * loadCycle() and activeCycleId() as the cycle in charge.
+     */
+    private function action_deactivate_cycle(array $cycle): void
+    {
+        $stmt = $this->db->prepare("UPDATE academic_cycles SET is_active = 0 WHERE id = ?");
+        $stmt->execute([(int)$cycle['id']]);
+    }
+
     private function action_timeout_pending_decisions(array $cycle): void
     {
         $stmt = $this->db->prepare("
-            UPDATE allocations a
+            SELECT a.id, a.offer_id
+            FROM allocations a
             JOIN matching_rounds r ON r.id = a.round_id
-            SET a.decision = 'timed_out', a.decision_at = NOW()
             WHERE r.cycle_id = ? AND a.decision = 'pending'
         ");
         $stmt->execute([(int)$cycle['id']]);
+        $pending = $stmt->fetchAll();
 
-        // A student who never answered has not taken their seat, so it must go
-        // back into the pool for the next round. Seat counts are derived from
-        // the accepted allocations, and these rows just stopped being pending
-        // without becoming accepted, so a recount releases them.
+        $update = $this->db->prepare("
+            UPDATE allocations
+            SET decision = ?, status = ?, decision_at = NOW(), decision_source = 'simulated'
+            WHERE id = ?
+        ");
+
+        foreach ($pending as $row) {
+            $roll = random_int(0, 2);          // 0 = reject, 1 and 2 = accept
+            if ($roll === 0) {
+                $update->execute(['rejected', 'rejected', (int)$row['id']]);
+            } else {
+                $update->execute(['accepted', 'confirmed', (int)$row['id']]);
+            }
+        }
+
+        // Seats are derived from the accepted allocations, so recount once the
+        // decisions are in. A simulated rejection releases its seat for the next
+        // round exactly as a real one would.
         recomputeOfferFilled($this->db);
     }
 

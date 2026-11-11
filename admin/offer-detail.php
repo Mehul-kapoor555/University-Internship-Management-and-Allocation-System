@@ -155,19 +155,6 @@ require '../includes/header.php';
     <div class="field-row"><span>Capacity</span><span><?= (int)$offer['capacity'] ?> student<?= (int)$offer['capacity'] === 1 ? '' : 's' ?></span></div>
     <div class="field-row"><span>Duration</span><span><?= (int)$offer['duration_months'] ?> months</span></div>
     <div class="field-row">
-        <span>Application deadline</span>
-        <span>
-            <?php if ($offer['application_deadline']): ?>
-                <?= htmlspecialchars(date('d M Y', strtotime($offer['application_deadline']))) ?>
-                <?php if ($offer['application_deadline'] < date('Y-m-d')): ?>
-                    <span class="badge badge-closed">Already passed</span>
-                <?php endif; ?>
-            <?php else: ?>
-                <span class="badge badge-pending">Not set</span>
-            <?php endif; ?>
-        </span>
-    </div>
-    <div class="field-row">
         <span>Compensation</span>
         <span><?php
             if ((int)$offer['is_paid'] === 1) {

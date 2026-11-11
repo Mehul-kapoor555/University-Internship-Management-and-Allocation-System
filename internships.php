@@ -7,12 +7,17 @@ requireLogin();
 $user = currentUser();
 $activePage = 'internships';
 
+// Offers stay hidden from students until the coordinator opens applications.
+// Before that the cycle is still being prepared, so there is nothing for a
+// student to look at yet.
+$canBrowse = studentsCanBrowse($db);
+
 // Handle manual refresh (student only)
 $refreshMessage = '';
 $refreshError = '';
 $studentId = null;
 
-if ($user['role'] === 'student') {
+if ($user['role'] === 'student' && $canBrowse) {
     $stmt = $db->prepare("SELECT id FROM students WHERE user_id = ?");
     $stmt->execute([$user['id']]);
     $studentRow = $stmt->fetch();
@@ -51,7 +56,7 @@ $ineligibleOffers = [];
 $offerSkillsById = [];
 $gapsByOffer = [];
 
-if ($user['role'] === 'student' && $studentId) {
+if ($user['role'] === 'student' && $studentId && $canBrowse) {
 
     // Eligible: driven by recommendation_scores (ranked)
     $sql = "SELECT rs.score, rs.rank_position, rs.explanation,
@@ -305,7 +310,13 @@ function render_plain_offer($offer, $skills) {
 
 <?php if ($user['role'] === 'student'): ?>
 
-    <?php if (empty($eligibleOffers) && empty($ineligibleOffers)): ?>
+    <?php if (!$canBrowse): ?>
+        <div class="card empty-state">
+            <p><strong>The internship cycle has not opened yet.</strong></p>
+            <p>Offers will appear here once the coordinator opens applications.
+               You will get a notification when that happens.</p>
+        </div>
+    <?php elseif (empty($eligibleOffers) && empty($ineligibleOffers)): ?>
         <div class="card empty-state"><p>No open offers match your filters.</p></div>
     <?php else: ?>
 

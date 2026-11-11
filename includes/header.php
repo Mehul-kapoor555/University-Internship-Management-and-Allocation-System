@@ -20,8 +20,10 @@ $navByRole = [
     ],
     'professor' => [
         ['Dashboard', BASE_URL . '/dashboard.php', 'dashboard'],
+        // Posting is reached from the "+ Post a new offer" button on My offers,
+        // mirroring how the coordinator reaches Add user from the Users page,
+        // rather than taking a second slot in the menu.
         ['My offers', BASE_URL . '/professor/my-offers.php', 'my-offers'],
-        ['Post an offer', BASE_URL . '/professor/post-offer.php', 'post-offer'],
         ['Applicants', BASE_URL . '/professor/applicants.php', 'applicants'],
         ['Rank applicants', BASE_URL . '/professor/rank-applicants.php', 'rank-applicants'],
         ['My students', BASE_URL . '/professor/students.php', 'students'],
@@ -30,8 +32,9 @@ $navByRole = [
     ],
     'company' => [
         ['Dashboard', BASE_URL . '/dashboard.php', 'dashboard'],
+        // Posting is reached from the "+ Post a new offer" button on My offers,
+        // mirroring how the coordinator reaches Add user from the Users page.
         ['My offers', BASE_URL . '/company/my-offers.php', 'my-offers'],
-        ['Post an offer', BASE_URL . '/company/post-offer.php', 'post-offer'],
         ['Applicants', BASE_URL . '/company/applicants.php', 'applicants'],
         ['Rank applicants', BASE_URL . '/company/rank-applicants.php', 'rank-applicants'],
         ['My profile', BASE_URL . '/profile.php', 'profile'],
@@ -41,8 +44,9 @@ $navByRole = [
         ['Cycle control', BASE_URL . '/admin/cycle-control.php', 'cycle-control'],
         ['Users', BASE_URL . '/admin/users.php', 'users'],
         ['Offers review', BASE_URL . '/admin/offer-reviews.php', 'offer-reviews'],
+        // Matching is run from Cycle control, as one step of the chain, so it no
+        // longer has a menu entry of its own.
         ['Academic cycles', BASE_URL . '/admin/cycles.php', 'cycles'],
-        ['Run matching', BASE_URL . '/admin/run-matching.php', 'run-matching'],
         ['Supervisor assignment', BASE_URL . '/admin/supervisor-assignments.php', 'supervisor-assignments'],
         ['Internship lifecycle', BASE_URL . '/admin/lifecycle-dashboard.php', 'lifecycle'],
         ['Email log', BASE_URL . '/admin/email-log.php', 'email-log'],

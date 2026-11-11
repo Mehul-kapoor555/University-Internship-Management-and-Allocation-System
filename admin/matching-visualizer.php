@@ -4,11 +4,11 @@ require '../includes/auth.php';
 requireRole(['coordinator']);
 
 $user = currentUser();
-$activePage = 'run-matching';
+$activePage = 'cycle-control';
 
 $roundId = (int)($_GET['round_id'] ?? 0);
 if (!$roundId) {
-    header('Location: ' . BASE_URL . '/admin/run-matching.php');
+    header('Location: ' . BASE_URL . '/admin/cycle-control.php');
     exit;
 }
 
@@ -22,7 +22,7 @@ $stmt = $db->prepare("
 $stmt->execute([$roundId]);
 $round = $stmt->fetch();
 if (!$round) {
-    header('Location: ' . BASE_URL . '/admin/run-matching.php');
+    header('Location: ' . BASE_URL . '/admin/cycle-control.php');
     exit;
 }
 
@@ -141,7 +141,7 @@ require '../includes/header.php';
         <?= count($traceRows) ?> trace steps ·
         <?= (int)$round['blocking_pairs'] ?> blocking pairs
     </p>
-    <p><a href="<?= BASE_URL ?>/admin/run-matching.php">← Back to matching runs</a></p>
+    <p><a href="<?= BASE_URL ?>/admin/cycle-control.php">← Back to cycle control</a></p>
 </div>
 
 <div class="viz-tabs">

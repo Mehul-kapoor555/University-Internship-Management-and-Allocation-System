@@ -58,7 +58,12 @@ if ($studentId) {
     $alreadyApplied = (bool)$existing;
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $studentId && !$alreadyApplied && $isEligible) {
+// Applying is only possible while the coordinator has applications open. The
+// matching runs on the applications as they stood when that window closed, so
+// one arriving afterwards would not be accounted for anywhere.
+$canApply = studentsCanApply($db);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $studentId && !$alreadyApplied && $isEligible && $canApply) {
     $coverLetter = trim($_POST['cover_letter'] ?? '');
     $stmt = $db->prepare(
         "INSERT INTO applications (student_id, offer_id, cover_letter) VALUES (?, ?, ?)"
@@ -188,6 +193,8 @@ require '../includes/header.php';
                 <h3>Apply</h3>
                 <?php if ($alreadyApplied): ?>
                     <p>You've already applied to this offer. Status: <span class="badge badge-<?= $existing['status'] ?>"><?= htmlspecialchars($existing['status']) ?></span></p>
+                <?php elseif (!$canApply): ?>
+                    <p style="margin:0;">Applications are closed for this cycle, so this offer is view-only now.</p>
                 <?php else: ?>
                     <form method="POST">
                         <label for="cover_letter">Cover letter (optional)</label>
@@ -219,7 +226,6 @@ require '../includes/header.php';
             <div class="field-row"><span>Min. CFU</span><span><?= $offer['min_cfu'] ?? '—' ?></span></div>
             <div class="field-row"><span>Program</span><span><?= htmlspecialchars($offer['required_program'] ?? 'Any') ?></span></div>
             <div class="field-row"><span>Capacity</span><span><?= (int)$offer['filled'] ?>/<?= (int)$offer['capacity'] ?></span></div>
-            <div class="field-row"><span>Deadline</span><span><?= htmlspecialchars($offer['application_deadline'] ?? '—') ?></span></div>
             <?php if ($offer['contact_email']): ?>
                 <div class="field-row"><span>Contact</span><span style="font-family:var(--font-mono);font-size:11px;"><?= htmlspecialchars($offer['contact_email']) ?></span></div>
             <?php endif; ?>

@@ -194,7 +194,6 @@ $offersSeed = [
         'description' => "Join Reply's cloud practice to work on real customer projects using AWS and Kubernetes. You'll design and deploy microservices, build CI/CD pipelines, and pair with senior engineers. This internship targets students strong in backend fundamentals who want to grow into cloud specialists.",
         'domain' => 'Cloud Computing', 'capacity' => 3, 'min_cfu' => 120, 'duration_months' => 6,
         'location' => 'Turin, Italy', 'is_remote' => 0, 'is_paid' => 1, 'stipend_monthly' => 800.00,
-        'application_deadline' => date('Y-m-d', strtotime('+45 days')),
         'skills' => [
             ['AWS', 'required', 'intermediate'],
             ['Docker', 'required', 'intermediate'],
@@ -210,7 +209,6 @@ $offersSeed = [
         'description' => "Engineering S.p.A. is looking for a backend intern to work on Spring-based microservices for enterprise clients. You will contribute to a large-scale system handling millions of transactions per day. Strong Java fundamentals and interest in distributed systems required.",
         'domain' => 'Software Engineering', 'capacity' => 2, 'min_cfu' => 130, 'duration_months' => 6,
         'location' => 'Rome, Italy', 'is_remote' => 1, 'is_paid' => 1, 'stipend_monthly' => 700.00,
-        'application_deadline' => date('Y-m-d', strtotime('+60 days')),
         'skills' => [
             ['Java', 'required', 'advanced'],
             ['Spring Framework', 'required', 'intermediate'],
@@ -226,7 +224,6 @@ $offersSeed = [
         'description' => "Build customer-facing dashboards for public administration clients. Modern React frontend, Node.js API, PostgreSQL backend. Good for students who like end-to-end ownership.",
         'domain' => 'Web Development', 'capacity' => 2, 'min_cfu' => 100, 'duration_months' => 4,
         'location' => 'Milan, Italy', 'is_remote' => 1, 'is_paid' => 1, 'stipend_monthly' => 650.00,
-        'application_deadline' => date('Y-m-d', strtotime('+30 days')),
         'skills' => [
             ['React', 'required', 'intermediate'],
             ['TypeScript', 'preferred', 'beginner'],
@@ -241,7 +238,6 @@ $offersSeed = [
         'description' => "NTT DATA's Palermo hub is expanding. You'll build data pipelines for banking clients, work with Kafka and Spark, and learn from a senior data engineering team.",
         'domain' => 'Data Science & Analytics', 'capacity' => 2, 'min_cfu' => 140, 'duration_months' => 6,
         'location' => 'Palermo, Italy', 'is_remote' => 0, 'is_paid' => 1, 'stipend_monthly' => 750.00,
-        'application_deadline' => date('Y-m-d', strtotime('+50 days')),
         'skills' => [
             ['Python', 'required', 'advanced'],
             ['SQL', 'required', 'advanced'],
@@ -257,7 +253,6 @@ $offersSeed = [
         'description' => "Sysdig is opening a research-oriented internship focused on container security and runtime threat detection. Ideal for security-minded students who want to understand what production cloud attacks look like.",
         'domain' => 'Cybersecurity', 'capacity' => 1, 'min_cfu' => 140, 'duration_months' => 6,
         'location' => 'Remote', 'is_remote' => 1, 'is_paid' => 1, 'stipend_monthly' => 900.00,
-        'application_deadline' => date('Y-m-d', strtotime('+40 days')),
         'skills' => [
             ['Cybersecurity', 'required', 'intermediate'],
             ['Linux system administration', 'required', 'advanced'],
@@ -273,7 +268,6 @@ $offersSeed = [
         'description' => "Research internship on integrating SAST and DAST tools into GitHub Actions pipelines. You'll work with real vulnerable applications (PyGoat, WebGoat) and contribute to a research paper on false-positive triage in enterprise CI/CD.",
         'domain' => 'DevSecOps', 'capacity' => 1, 'min_cfu' => 130, 'duration_months' => 4,
         'location' => 'MIFT Department, UNIME', 'is_remote' => 0, 'is_paid' => 0, 'stipend_monthly' => null,
-        'application_deadline' => date('Y-m-d', strtotime('+35 days')),
         'skills' => [
             ['DevSecOps', 'required', 'beginner'],
             ['SAST / static security testing', 'preferred', 'beginner'],
@@ -288,7 +282,6 @@ $offersSeed = [
         'description' => "Work with Prof. Finocchio's group on ML models for Ising machine simulations. You'll build datasets, train neural networks, and analyse convergence behaviour. Strong Python and math skills required.",
         'domain' => 'Artificial Intelligence', 'capacity' => 2, 'min_cfu' => 150, 'duration_months' => 6,
         'location' => 'MIFT Department, UNIME', 'is_remote' => 0, 'is_paid' => 1, 'stipend_monthly' => 400.00,
-        'application_deadline' => date('Y-m-d', strtotime('+45 days')),
         'skills' => [
             ['Machine learning', 'required', 'intermediate'],
             ['Python', 'required', 'advanced'],
@@ -304,7 +297,6 @@ $offersSeed = [
         'description' => "Research internship in the Mathematics department. You'll work on graph-based scheduling problems using ILP solvers and heuristic algorithms. Great for students who like theory + implementation.",
         'domain' => 'Algorithms', 'capacity' => 1, 'min_cfu' => 130, 'duration_months' => 4,
         'location' => 'Mathematics Department, UNIME', 'is_remote' => 0, 'is_paid' => 0, 'stipend_monthly' => null,
-        'application_deadline' => date('Y-m-d', strtotime('+30 days')),
         'skills' => [
             ['Optimisation theory', 'required', 'intermediate'],
             ['Graph theory', 'required', 'intermediate'],
@@ -319,7 +311,6 @@ $offersSeed = [
         'description' => "Extend Prof. Villari's edge-cloud continuum work. You'll help evaluate Kubernetes-based orchestration on constrained edge nodes and contribute to an open-source deployment tool.",
         'domain' => 'Cloud Computing', 'capacity' => 1, 'min_cfu' => 140, 'duration_months' => 6,
         'location' => 'MIFT Department, UNIME', 'is_remote' => 0, 'is_paid' => 0, 'stipend_monthly' => null,
-        'application_deadline' => date('Y-m-d', strtotime('+55 days')),
         'skills' => [
             ['Kubernetes', 'required', 'intermediate'],
             ['Docker', 'required', 'advanced'],
@@ -335,7 +326,6 @@ $offersSeed = [
         'description' => "Design and prototype internal tools UX. Draft — pending coordinator review.",
         'domain' => 'Web Development', 'capacity' => 1, 'min_cfu' => 90, 'duration_months' => 3,
         'location' => 'Turin', 'is_remote' => 1, 'is_paid' => 0, 'stipend_monthly' => null,
-        'application_deadline' => date('Y-m-d', strtotime('+60 days')),
         'skills' => [
             ['React', 'required', 'beginner'],
             ['CSS', 'required', 'intermediate'],
@@ -349,7 +339,6 @@ $offersSeed = [
         'description' => "Draft offer. Research on anomaly detection in network traffic.",
         'domain' => 'Cybersecurity', 'capacity' => 1, 'min_cfu' => 140, 'duration_months' => 5,
         'location' => 'MIFT', 'is_remote' => 0, 'is_paid' => 0, 'stipend_monthly' => null,
-        'application_deadline' => date('Y-m-d', strtotime('+40 days')),
         'skills' => [
             ['Network security', 'required', 'intermediate'],
             ['Machine learning', 'required', 'intermediate'],
@@ -364,13 +353,13 @@ foreach ($offersSeed as $o) {
     $stmt = $db->prepare(
         "INSERT INTO internship_offers
          (posted_by_user_id, type, title, description, domain, capacity, min_cfu, duration_months,
-          location, is_remote, is_paid, stipend_monthly, application_deadline, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          location, is_remote, is_paid, stipend_monthly, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     );
     $stmt->execute([
         $o['poster_user_id'], $o['type'], $o['title'], $o['description'], $o['domain'],
         $o['capacity'], $o['min_cfu'], $o['duration_months'], $o['location'], $o['is_remote'],
-        $o['is_paid'], $o['stipend_monthly'], $o['application_deadline'], $o['status']
+        $o['is_paid'], $o['stipend_monthly'], $o['status']
     ]);
     $offerId = $db->lastInsertId();
     $offerIds[] = $offerId;

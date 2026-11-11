@@ -14,8 +14,13 @@ $cycleId = activeCycleId($db);
 
 $message = '';
 
+// Preferences can only change while applications are open. The matcher runs on
+// the order as it stood when that window closed, so a later edit would never be
+// seen by the allocation it was meant to influence.
+$canApply = studentsCanApply($db);
+
 // Handle save
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $studentId) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $studentId && $canApply) {
     $rankedIds = json_decode($_POST['ranked_ids'], true);
     if (is_array($rankedIds)) {
         $db->prepare("DELETE FROM student_preferences WHERE student_id = ?")->execute([$studentId]);
@@ -31,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $stu
 }
 
 // Handle "load from recommendations"
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_recommendations']) && $studentId) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_recommendations']) && $studentId && $canApply) {
     // Get eligible applied offers, ordered by recommendation rank
     $stmt = $db->prepare("
         SELECT DISTINCT a.offer_id, rs.rank_position
@@ -109,14 +114,21 @@ require '../includes/header.php';
     <div>
         <h3 style="margin:0;">Preference ranking</h3>
         <p style="margin:4px 0 0;font-size:13px;color:var(--slate);">
-            Drag rows to reorder, or load a suggested ranking from your recommendations.
+            <?php if ($canApply): ?>
+                Drag rows to reorder, or load a suggested ranking from your recommendations.
+            <?php else: ?>
+                Applications are closed, so this list is view-only. This is the order
+                the matching will use.
+            <?php endif; ?>
         </p>
     </div>
-    <form method="POST" style="margin:0;">
-        <button type="submit" name="load_recommendations" value="1" class="btn btn-secondary" style="width:auto;">
-            ↓ Load from recommendations
-        </button>
-    </form>
+    <?php if ($canApply): ?>
+        <form method="POST" style="margin:0;">
+            <button type="submit" name="load_recommendations" value="1" class="btn btn-secondary" style="width:auto;">
+                ↓ Load from recommendations
+            </button>
+        </form>
+    <?php endif; ?>
 </div>
 
 <?php if (empty($preferences) && empty($missingAppliedOffers)): ?>
@@ -162,7 +174,9 @@ require '../includes/header.php';
                 <?php endforeach; ?>
             </ul>
         </div>
-        <button type="submit" class="btn btn-primary" style="width:auto;margin-top:16px;">Save preferences</button>
+        <?php if ($canApply): ?>
+            <button type="submit" class="btn btn-primary" style="width:auto;margin-top:16px;">Save preferences</button>
+        <?php endif; ?>
     </form>
 
 <?php endif; ?>
@@ -215,10 +229,14 @@ require '../includes/header.php';
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
-    // Make items draggable
+    // Make items draggable — only while applications are open. Once they close
+    // the list is view-only, and letting rows be dragged with no way to save
+    // would suggest the order still counts for something.
+    <?php if ($canApply): ?>
     list.querySelectorAll('.pref-item').forEach(function(el) {
         el.setAttribute('draggable', 'true');
     });
+    <?php endif; ?>
 
     // On submit, serialize order
     var form = document.getElementById('pref-form');

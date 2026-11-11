@@ -76,11 +76,6 @@ require '../includes/header.php';
                 <span><?= htmlspecialchars(ucfirst($offer['type'])) ?></span>
                 <span><?= (int)$offer['capacity'] ?> place<?= (int)$offer['capacity'] === 1 ? '' : 's' ?></span>
                 <span><?= (int)$offer['skill_count'] ?> skill<?= (int)$offer['skill_count'] === 1 ? '' : 's' ?></span>
-                <?php if ($offer['application_deadline']): ?>
-                    <span>Closes <?= htmlspecialchars(date('d M Y', strtotime($offer['application_deadline']))) ?></span>
-                <?php else: ?>
-                    <span class="badge badge-pending">No deadline set</span>
-                <?php endif; ?>
             </div>
 
             <div style="margin-top:12px;">

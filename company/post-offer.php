@@ -4,21 +4,16 @@ require '../includes/auth.php';
 requireRole(['company']);
 
 $user = currentUser();
-$activePage = 'post-offer';
+// Posting no longer has its own menu entry, so keep "My offers" highlighted
+// while the form is open — that is the section this page belongs to.
+$activePage = 'my-offers';
 $error = '';
 $old = $_POST;
 
-// An application deadline has to fall inside the cycle it belongs to: after
-// today, and not past the end of the active academic cycle. Both bounds are
-// applied to the date input and re-checked on the server.
-$cycleId = activeCycleId($db);
-$cycleEnd = null;
-if ($cycleId) {
-    $stmt = $db->prepare("SELECT end_date FROM academic_cycles WHERE id = ?");
-    $stmt->execute([$cycleId]);
-    $cycleEnd = $stmt->fetchColumn() ?: null;
-}
-$minDeadline = date('Y-m-d', strtotime('+1 day'));
+// Offers carry no deadline of their own. Applying is governed by the cycle:
+// students can apply while the coordinator has applications open, and cannot
+// once they are closed. A per-offer date would be a second, competing answer to
+// a question the cycle already settles.
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $title = trim($_POST['title'] ?? '');
@@ -41,19 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $contactEmail = trim($_POST['contact_email'] ?? '');
-    $deadline = trim($_POST['application_deadline'] ?? '');
 
     // ---- validation ----
     if ($title === '' || $description === '') {
         $error = 'Title and description are required.';
-    } elseif ($deadline === '') {
-        $error = 'An application deadline is required. Students cannot rank an offer that never closes.';
-    } elseif (!strtotime($deadline)) {
-        $error = 'That application deadline is not a valid date.';
-    } elseif ($deadline < $minDeadline) {
-        $error = 'The application deadline must be in the future.';
-    } elseif ($cycleEnd && $deadline > $cycleEnd) {
-        $error = 'The application deadline cannot fall after the academic cycle ends (' . htmlspecialchars($cycleEnd) . ').';
     } elseif ($isPaid && $stipend !== null && $stipend < 0) {
         $error = 'The monthly stipend cannot be negative.';
     } else {
@@ -61,13 +47,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             "INSERT INTO internship_offers
              (posted_by_user_id, type, title, description, domain, capacity, min_cfu,
               required_program, duration_months, location, is_remote, is_paid,
-              stipend_monthly, contact_email, application_deadline, status)
-             VALUES (?, 'company', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')"
+              stipend_monthly, contact_email, status)
+             VALUES (?, 'company', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft')"
         );
         $stmt->execute([
             $user['id'], $title, $description, $domain, $capacity, $minCfu,
             $requiredProgram, $durationMonths, $location, $isRemote, $isPaid,
-            $stipend, $contactEmail, $deadline
+            $stipend, $contactEmail
         ]);
         $offerId = (int)$db->lastInsertId();
 
@@ -163,16 +149,6 @@ require '../includes/header.php';
 
     <label for="contact_email">Contact email (if different from your account)</label>
     <input type="email" id="contact_email" name="contact_email" value="<?= keep($old, 'contact_email') ?>">
-
-    <label for="application_deadline">Application deadline <span style="color:var(--mosaic-gold);">*</span></label>
-    <input type="date" id="application_deadline" name="application_deadline" required
-           value="<?= keep($old, 'application_deadline') ?>"
-           min="<?= htmlspecialchars($minDeadline) ?>"
-           <?= $cycleEnd ? 'max="' . htmlspecialchars($cycleEnd) . '"' : '' ?>>
-    <p style="font-size:12px;color:var(--slate-light);margin:-6px 0 12px;">
-        Required. Students cannot rank an offer that never closes.<?php
-        if ($cycleEnd): ?> Must fall on or before the cycle end, <?= htmlspecialchars($cycleEnd) ?>.<?php endif; ?>
-    </p>
 
     <label>Required skills</label>
     <div class="skill-picker"

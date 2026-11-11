@@ -81,7 +81,7 @@ def load_open_offers(cur) -> List[dict]:
     cur.execute("""
         SELECT o.id, o.title, o.description, o.domain, o.type, o.capacity, o.filled,
                o.min_cfu, o.required_program, o.duration_months, o.is_paid,
-               o.is_remote, o.application_deadline
+               o.is_remote
         FROM internship_offers o
         WHERE o.status = 'open'
     """)

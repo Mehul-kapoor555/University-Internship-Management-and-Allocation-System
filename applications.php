@@ -69,10 +69,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
         try {
             $db->beginTransaction();
 
+            // decision_source = 'student' marks this as the student's own choice,
+            // so it is never confused with one the demo harness generated when
+            // the coordinator closed the decision window.
             if ($choice === 'accepted') {
                 $db->prepare("
                     UPDATE allocations
-                    SET decision = 'accepted', status = 'confirmed', decision_at = NOW()
+                    SET decision = 'accepted', status = 'confirmed', decision_at = NOW(),
+                        decision_source = 'student'
                     WHERE id = ?
                 ")->execute([$allocationId]);
 
@@ -80,7 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
             } else {
                 $db->prepare("
                     UPDATE allocations
-                    SET decision = 'rejected', status = 'rejected', decision_at = NOW()
+                    SET decision = 'rejected', status = 'rejected', decision_at = NOW(),
+                        decision_source = 'student'
                     WHERE id = ?
                 ")->execute([$allocationId]);
 

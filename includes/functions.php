@@ -13,6 +13,45 @@ function activeCycleId(PDO $db): ?int {
 }
 
 /**
+ * Current state of the active cycle, or null when there is no active cycle.
+ */
+function cycleState(PDO $db): ?string {
+    $stmt = $db->query(
+        "SELECT current_state FROM academic_cycles WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+    );
+    $state = $stmt->fetchColumn();
+    return $state !== false ? $state : null;
+}
+
+/**
+ * May students see the offer list at all?
+ *
+ * Nothing is visible until the coordinator opens applications. Before that the
+ * cycle is still being prepared — offers are being reviewed and corrected — so
+ * showing them would advertise things that may still change or be rejected.
+ *
+ * From the moment applications open the list stays visible for the rest of the
+ * cycle, so a student can always look back at what they applied to, even once
+ * applying itself has closed.
+ */
+function studentsCanBrowse(PDO $db): bool {
+    $state = cycleState($db);
+    return $state !== null && $state !== 'DRAFT' && $state !== 'CANCELLED';
+}
+
+/**
+ * May students still apply and change their preference order?
+ *
+ * Only while applications are open. Once the coordinator closes them the
+ * student side becomes view-only: the matching runs on the applications and
+ * preferences as they stood at that moment, so allowing either to change
+ * afterwards would mean matching against data nobody agreed to.
+ */
+function studentsCanApply(PDO $db): bool {
+    return cycleState($db) === 'APPLICATIONS_OPEN';
+}
+
+/**
  * Recomputes internship_offers.filled from the allocations that actually exist.
  *
  *     filled = number of allocations on this offer with decision = 'accepted'

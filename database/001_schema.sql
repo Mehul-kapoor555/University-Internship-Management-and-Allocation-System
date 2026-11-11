@@ -416,8 +416,14 @@ INSERT INTO `users` (`email`, `password_hash`, `role`, `first_name`, `last_name`
 INSERT INTO `coordinators` (`user_id`, `department`) VALUES
   (1, 'Computer Science');
 
--- A default academic cycle
-INSERT INTO `academic_cycles` (`name`, `start_date`, `end_date`, `is_active`) VALUES
-  ('2025-2026', '2025-10-01', '2026-09-30', 1);
+-- No academic cycle is seeded on purpose.
+--
+-- A cycle is something the coordinator starts, from Cycle control, when they
+-- are ready. Shipping one that is already active meant a fresh install came up
+-- mid-process with a cycle nobody had opened, and students could see offers
+-- before anyone had decided the cycle had begun.
+--
+-- With no cycle present, Cycle control opens on its "Start a cycle" form and
+-- the student pages correctly show nothing until applications are opened.
 
 SET FOREIGN_KEY_CHECKS = 1;

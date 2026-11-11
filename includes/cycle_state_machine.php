@@ -27,6 +27,9 @@ return [
                 'target' => 'CANCELLED',
                 'label' => 'Cancel cycle',
                 'requires' => [],
+                // Stands the cycle down as well as marking it cancelled: a
+                // cancelled cycle is not the one the system should be running.
+                'on_transition' => 'action_deactivate_cycle',
             ],
         ],
     ],
@@ -47,6 +50,9 @@ return [
                 'target' => 'CANCELLED',
                 'label' => 'Cancel cycle',
                 'requires' => [],
+                // Stands the cycle down as well as marking it cancelled: a
+                // cancelled cycle is not the one the system should be running.
+                'on_transition' => 'action_deactivate_cycle',
             ],
         ],
     ],
