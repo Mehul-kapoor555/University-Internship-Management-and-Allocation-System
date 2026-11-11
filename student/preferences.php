@@ -23,7 +23,10 @@ $canApply = studentsCanApply($db);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $studentId && $canApply) {
     $rankedIds = json_decode($_POST['ranked_ids'], true);
     if (is_array($rankedIds)) {
-        $db->prepare("DELETE FROM student_preferences WHERE student_id = ?")->execute([$studentId]);
+        // Only this cycle's rows. Preferences used to be deleted for the
+        // student across every cycle, which wiped their history.
+        $db->prepare("DELETE FROM student_preferences WHERE student_id = ? AND cycle_id = ?")
+           ->execute([$studentId, $cycleId]);
         $ins = $db->prepare(
             "INSERT INTO student_preferences (student_id, offer_id, `rank`, cycle_id, source)
              VALUES (?, ?, ?, ?, 'manual')"
@@ -42,14 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_recommendations'
         SELECT DISTINCT a.offer_id, rs.rank_position
         FROM applications a
         JOIN recommendation_scores rs ON rs.offer_id = a.offer_id AND rs.student_id = a.student_id
-        WHERE a.student_id = ? AND a.status != 'withdrawn'
+        WHERE a.student_id = ? AND a.cycle_id = ? AND a.status != 'withdrawn'
         ORDER BY rs.rank_position ASC
     ");
-    $stmt->execute([$studentId]);
+    $stmt->execute([$studentId, $cycleId]);
     $ordered = $stmt->fetchAll();
 
     if (!empty($ordered)) {
-        $db->prepare("DELETE FROM student_preferences WHERE student_id = ?")->execute([$studentId]);
+        $db->prepare("DELETE FROM student_preferences WHERE student_id = ? AND cycle_id = ?")
+           ->execute([$studentId, $cycleId]);
         $ins = $db->prepare(
             "INSERT INTO student_preferences (student_id, offer_id, `rank`, cycle_id, source)
              VALUES (?, ?, ?, ?, 'recommendation')"
@@ -74,10 +78,10 @@ if ($studentId) {
         JOIN internship_offers o ON o.id = sp.offer_id
         JOIN users u ON u.id = o.posted_by_user_id
         LEFT JOIN companies c ON c.user_id = u.id
-        WHERE sp.student_id = ?
+        WHERE sp.student_id = ? AND sp.cycle_id = ?
         ORDER BY sp.`rank` ASC
     ");
-    $stmt->execute([$studentId]);
+    $stmt->execute([$studentId, $cycleId]);
     $preferences = $stmt->fetchAll();
 }
 
@@ -91,12 +95,13 @@ if ($studentId) {
         JOIN internship_offers o ON o.id = a.offer_id
         JOIN users u ON u.id = o.posted_by_user_id
         LEFT JOIN companies c ON c.user_id = u.id
-        WHERE a.student_id = ? AND a.status != 'withdrawn'
+        WHERE a.student_id = ? AND a.cycle_id = ? AND a.status != 'withdrawn'
           AND a.offer_id NOT IN (
-              SELECT offer_id FROM student_preferences WHERE student_id = ?
+              SELECT offer_id FROM student_preferences
+              WHERE student_id = ? AND cycle_id = ?
           )
     ");
-    $stmt->execute([$studentId, $studentId]);
+    $stmt->execute([$studentId, $cycleId, $studentId, $cycleId]);
     $missingAppliedOffers = $stmt->fetchAll();
 }
 

@@ -57,12 +57,16 @@ class IntegrityChecker
 
     public function check_applications_present(array $cycle): array
     {
+        // Applications carry a cycle. Without the filter these checks counted
+        // every application ever made, so a brand-new cycle passed on data
+        // that belonged to an older one.
         $stmt = $this->db->prepare("
             SELECT COUNT(*) FROM applications a
             JOIN internship_offers o ON o.id = a.offer_id
             WHERE a.status != 'withdrawn' AND o.status = 'open'
+              AND a.cycle_id = ?
         ");
-        $stmt->execute();
+        $stmt->execute([(int)$cycle['id']]);
         $n = (int)$stmt->fetchColumn();
         return [
             'status'  => $n > 0 ? 'pass' : 'fail',
@@ -80,8 +84,9 @@ class IntegrityChecker
             JOIN students s ON s.id = a.student_id
             JOIN internship_offers o ON o.id = a.offer_id
             WHERE a.status != 'withdrawn' AND o.status != 'open'
+              AND a.cycle_id = ?
         ");
-        $stmt->execute();
+        $stmt->execute([(int)$cycle['id']]);
         $bad = $stmt->fetchAll();
         return [
             'status'  => empty($bad) ? 'pass' : 'fail',
@@ -101,11 +106,12 @@ class IntegrityChecker
             JOIN users u ON u.id = s.user_id
             JOIN applications a ON a.student_id = s.id
             WHERE a.status != 'withdrawn'
+              AND a.cycle_id = ?
               AND s.id NOT IN (
                   SELECT student_id FROM student_preferences WHERE cycle_id = ?
               )
         ");
-        $stmt->execute([(int)$cycle['id']]);
+        $stmt->execute([(int)$cycle['id'], (int)$cycle['id']]);
         $missing = $stmt->fetchAll();
         return [
             'status'  => empty($missing) ? 'pass' : 'warn',
@@ -123,9 +129,10 @@ class IntegrityChecker
             SELECT a.id FROM applications a
             LEFT JOIN students s ON s.id = a.student_id
             LEFT JOIN internship_offers o ON o.id = a.offer_id
-            WHERE s.id IS NULL OR o.id IS NULL
+            WHERE a.cycle_id = ?
+              AND (s.id IS NULL OR o.id IS NULL)
         ");
-        $stmt->execute();
+        $stmt->execute([(int)$cycle['id']]);
         $orphans = $stmt->fetchAll();
         return [
             'status'  => empty($orphans) ? 'pass' : 'fail',
@@ -145,10 +152,14 @@ class IntegrityChecker
             SELECT o.id, o.title
             FROM internship_offers o
             WHERE o.status = 'open'
-              AND EXISTS (SELECT 1 FROM applications a WHERE a.offer_id = o.id AND a.status != 'withdrawn')
+              AND EXISTS (
+                  SELECT 1 FROM applications a
+                  WHERE a.offer_id = o.id AND a.status != 'withdrawn'
+                    AND a.cycle_id = ?
+              )
               AND o.id NOT IN (SELECT offer_id FROM offer_rankings WHERE cycle_id = ?)
         ");
-        $stmt->execute([(int)$cycle['id']]);
+        $stmt->execute([(int)$cycle['id'], (int)$cycle['id']]);
         $unranked = $stmt->fetchAll();
         return [
             'status'  => empty($unranked) ? 'pass' : 'fail',
@@ -172,6 +183,7 @@ class IntegrityChecker
                   SELECT 1 FROM applications a
                   WHERE a.offer_id = r.offer_id AND a.student_id = r.student_id
                     AND a.status != 'withdrawn'
+                    AND a.cycle_id = r.cycle_id
               )
         ");
         $stmt->execute([(int)$cycle['id']]);

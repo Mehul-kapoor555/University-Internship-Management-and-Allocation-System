@@ -44,14 +44,16 @@ def load_matching_data(cur, cycle_id: int):
     Loads all preferences and capacities for the given academic cycle.
     Returns: (student_prefs, offer_prefs, offer_capacities, offer_current_filled)
     """
-    # Student preferences (ranked list of offer_ids per student)
+    # Student preferences (ranked list of offer_ids per student).
+    # Scoped to this cycle: preferences and rankings carry a cycle_id, and
+    # without the filter one cycle's matching read every other cycle's rows.
     cur.execute("""
         SELECT sp.student_id, sp.offer_id, sp.`rank`
         FROM student_preferences sp
         JOIN internship_offers o ON o.id = sp.offer_id
-        WHERE o.status = 'open'
+        WHERE o.status = 'open' AND sp.cycle_id = %s
         ORDER BY sp.student_id, sp.`rank` ASC
-    """)
+    """, (cycle_id,))
     student_prefs = {}
     for row in cur.fetchall():
         student_prefs.setdefault(row['student_id'], []).append(row['offer_id'])
@@ -61,9 +63,9 @@ def load_matching_data(cur, cycle_id: int):
         SELECT o_rank.offer_id, o_rank.student_id, o_rank.`rank`
         FROM offer_rankings o_rank
         JOIN internship_offers o ON o.id = o_rank.offer_id
-        WHERE o.status = 'open'
+        WHERE o.status = 'open' AND o_rank.cycle_id = %s
         ORDER BY o_rank.offer_id, o_rank.`rank` ASC
-    """)
+    """, (cycle_id,))
     offer_prefs = {}
     for row in cur.fetchall():
         offer_prefs.setdefault(row['offer_id'], []).append(row['student_id'])
@@ -228,6 +230,24 @@ def run(cycle_id: int) -> dict:
 
     student_prefs, offer_prefs, offer_capacities, offer_filled = load_matching_data(cur, cycle_id)
 
+    # Anyone who applied this cycle but has no preference rows cannot be seen
+    # by the algorithm at all — they are not ranked last, they are absent.
+    # auto_ranking.php is supposed to make this impossible, so this count
+    # should always be 0. It is reported either way rather than assumed, so a
+    # student can never go missing without it showing up.
+    cur.execute("""
+        SELECT COUNT(DISTINCT a.student_id) AS n
+        FROM applications a
+        JOIN internship_offers o ON o.id = a.offer_id
+        WHERE a.cycle_id = %s
+          AND a.status <> 'withdrawn'
+          AND o.status = 'open'
+          AND a.student_id NOT IN (
+              SELECT student_id FROM student_preferences WHERE cycle_id = %s
+          )
+    """, (cycle_id, cycle_id))
+    applied_but_unranked = int(cur.fetchone()['n'])
+
     if not student_prefs:
         cur.close(); conn.close()
         return {'error': 'No student preferences found. Students need to rank offers before matching can run.'}
@@ -266,6 +286,7 @@ def run(cycle_id: int) -> dict:
         'total_students': len(student_prefs),
         'matched_students': matched_count,
         'unmatched_students': len(unmatched_students),
+        'applied_but_unranked': applied_but_unranked,
         'total_offers': len(offer_capacities),
         'offers_with_matches': sum(1 for oid in matching if matching[oid]),
         'trace_steps': len(trace),

@@ -9,15 +9,21 @@ $activePage = 'applicants';
 $refreshMessage = '';
 $refreshError = '';
 
+// Applicants are shown for the cycle running now. Applications carry a cycle,
+// and without the filter an offer listed applicants from every cycle it has
+// ever been open in.
+$cycleId = activeCycleId($db);
+
 // Load this company's offers (with app counts)
 $stmt = $db->prepare("
     SELECT o.id, o.title, o.status, o.filled, o.capacity,
-           (SELECT COUNT(*) FROM applications a WHERE a.offer_id = o.id AND a.status != 'withdrawn') AS app_count
+           (SELECT COUNT(*) FROM applications a
+             WHERE a.offer_id = o.id AND a.cycle_id = ? AND a.status != 'withdrawn') AS app_count
     FROM internship_offers o
     WHERE o.posted_by_user_id = ?
     ORDER BY o.status = 'open' DESC, o.created_at DESC
 ");
-$stmt->execute([$user['id']]);
+$stmt->execute([$cycleId, $user['id']]);
 $offers = $stmt->fetchAll();
 
 $selectedOfferId = (int)($_GET['offer_id'] ?? 0);
@@ -97,10 +103,10 @@ if ($selectedOfferId) {
             JOIN applications a ON a.id = ar.application_id
             JOIN students s ON s.id = ar.student_id
             JOIN users u ON u.id = s.user_id
-            WHERE ar.offer_id = ?
+            WHERE ar.offer_id = ? AND a.cycle_id = ?
             ORDER BY ar.rank_position ASC
         ");
-        $stmt->execute([$selectedOfferId]);
+        $stmt->execute([$selectedOfferId, $cycleId]);
         $applicants = $stmt->fetchAll();
     }
 }

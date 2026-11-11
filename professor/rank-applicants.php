@@ -9,15 +9,19 @@ $activePage = 'applicants';
 $message = '';
 $cycleId = activeCycleId($db);
 
-// Load professor's offers
+// Load professor's offers.
+// The applicant count is for the cycle running now — applications carry a
+// cycle, and without the filter an offer showed applicants from every cycle it
+// has ever been open in.
 $stmt = $db->prepare("
     SELECT o.id, o.title, o.status,
-           (SELECT COUNT(*) FROM applications a WHERE a.offer_id = o.id AND a.status != 'withdrawn') AS app_count
+           (SELECT COUNT(*) FROM applications a
+             WHERE a.offer_id = o.id AND a.cycle_id = ? AND a.status != 'withdrawn') AS app_count
     FROM internship_offers o
     WHERE o.posted_by_user_id = ?
     ORDER BY o.status = 'open' DESC, o.created_at DESC
 ");
-$stmt->execute([$user['id']]);
+$stmt->execute([$cycleId, $user['id']]);
 $offers = $stmt->fetchAll();
 
 $selectedOfferId = (int)($_GET['offer_id'] ?? 0);
@@ -34,7 +38,8 @@ if ($selectedOfferId) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ranked_ids']) && $selectedOffer) {
     $rankedIds = json_decode($_POST['ranked_ids'], true);
     if (is_array($rankedIds)) {
-        $db->prepare("DELETE FROM offer_rankings WHERE offer_id = ?")->execute([$selectedOfferId]);
+        $db->prepare("DELETE FROM offer_rankings WHERE offer_id = ? AND cycle_id = ?")
+           ->execute([$selectedOfferId, $cycleId]);
         $ins = $db->prepare(
             "INSERT INTO offer_rankings (offer_id, student_id, `rank`, cycle_id, source)
              VALUES (?, ?, ?, ?, 'manual')"
@@ -65,7 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['load_algorithm']) && 
     $ordered = $stmt->fetchAll();
 
     if (!empty($ordered)) {
-        $db->prepare("DELETE FROM offer_rankings WHERE offer_id = ?")->execute([$selectedOfferId]);
+        $db->prepare("DELETE FROM offer_rankings WHERE offer_id = ? AND cycle_id = ?")
+           ->execute([$selectedOfferId, $cycleId]);
         $ins = $db->prepare(
             "INSERT INTO offer_rankings (offer_id, student_id, `rank`, cycle_id, source)
              VALUES (?, ?, ?, ?, 'recommendation')"
@@ -87,10 +93,10 @@ if ($selectedOffer) {
         FROM offer_rankings o_rank
         JOIN students s ON s.id = o_rank.student_id
         JOIN users u ON u.id = s.user_id
-        WHERE o_rank.offer_id = ?
+        WHERE o_rank.offer_id = ? AND o_rank.cycle_id = ?
         ORDER BY o_rank.`rank` ASC
     ");
-    $stmt->execute([$selectedOfferId]);
+    $stmt->execute([$selectedOfferId, $cycleId]);
     $ranking = $stmt->fetchAll();
 
     $stmt = $db->prepare("
@@ -99,10 +105,13 @@ if ($selectedOffer) {
         FROM applications a
         JOIN students s ON s.id = a.student_id
         JOIN users u ON u.id = s.user_id
-        WHERE a.offer_id = ? AND a.status != 'withdrawn'
-          AND s.id NOT IN (SELECT student_id FROM offer_rankings WHERE offer_id = ?)
+        WHERE a.offer_id = ? AND a.cycle_id = ? AND a.status != 'withdrawn'
+          AND s.id NOT IN (
+              SELECT student_id FROM offer_rankings
+              WHERE offer_id = ? AND cycle_id = ?
+          )
     ");
-    $stmt->execute([$selectedOfferId, $selectedOfferId]);
+    $stmt->execute([$selectedOfferId, $cycleId, $selectedOfferId, $cycleId]);
     $missingApplicants = $stmt->fetchAll();
 }
 

@@ -153,18 +153,24 @@ if ($user['role'] === 'student' && $student) {
 }
 
 /* -------------------------------------------------------------------------
- * APPLICATIONS LIST (existing behaviour, unchanged).
+ * APPLICATIONS LIST
+ *
+ * Scoped to the cycle that is running now. Applications used to carry no
+ * cycle, so every list showed every application ever made and a new cycle
+ * looked like it already had applications in it.
  * ---------------------------------------------------------------------- */
+$cycleId = activeCycleId($db);
+
 if ($user['role'] === 'student') {
     $stmt = $db->prepare(
         "SELECT a.*, o.title, o.type
          FROM applications a
          JOIN internship_offers o ON o.id = a.offer_id
          JOIN students s ON s.id = a.student_id
-         WHERE s.user_id = ?
+         WHERE s.user_id = ? AND a.cycle_id = ?
          ORDER BY a.applied_at DESC"
     );
-    $stmt->execute([$user['id']]);
+    $stmt->execute([$user['id'], $cycleId]);
     $rows = $stmt->fetchAll();
 
 } elseif ($user['role'] === 'company' || $user['role'] === 'professor') {
@@ -174,21 +180,23 @@ if ($user['role'] === 'student') {
          JOIN internship_offers o ON o.id = a.offer_id
          JOIN students s ON s.id = a.student_id
          JOIN users su ON su.id = s.user_id
-         WHERE o.posted_by_user_id = ?
+         WHERE o.posted_by_user_id = ? AND a.cycle_id = ?
          ORDER BY a.applied_at DESC"
     );
-    $stmt->execute([$user['id']]);
+    $stmt->execute([$user['id'], $cycleId]);
     $rows = $stmt->fetchAll();
 
 } elseif ($user['role'] === 'coordinator') {
-    $stmt = $db->query(
+    $stmt = $db->prepare(
         "SELECT a.*, o.title, CONCAT(su.first_name, ' ', su.last_name) AS student_name
          FROM applications a
          JOIN internship_offers o ON o.id = a.offer_id
          JOIN students s ON s.id = a.student_id
          JOIN users su ON su.id = s.user_id
+         WHERE a.cycle_id = ?
          ORDER BY a.applied_at DESC"
     );
+    $stmt->execute([$cycleId]);
     $rows = $stmt->fetchAll();
 }
 

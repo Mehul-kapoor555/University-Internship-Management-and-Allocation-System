@@ -22,11 +22,24 @@ class CycleStateMachine
     private array $definition;
     private IntegrityChecker $checker;
 
+    /**
+     * What the automatic application/ranking fill-in did on the last matching
+     * run. Kept so Cycle control can show it instead of the work happening
+     * invisibly. Empty until action_run_matching_engine has run.
+     */
+    private array $lastRankingSummary = [];
+
     public function __construct(PDO $db)
     {
         $this->db = $db;
         $this->definition = require __DIR__ . '/cycle_state_machine.php';
         $this->checker = new IntegrityChecker($db);
+    }
+
+    /** Summary of the last automatic application/ranking fill-in. */
+    public function lastRankingSummary(): array
+    {
+        return $this->lastRankingSummary;
     }
 
     // ---- QUERIES ----
@@ -211,6 +224,15 @@ class CycleStateMachine
 
     private function action_run_matching_engine(array $cycle): void
     {
+        // Before the matcher runs, make sure nobody is missing the rows it
+        // reads. The matcher only looks at student_preferences and
+        // offer_rankings, and a student with no preference rows is left out of
+        // the allocation entirely rather than ranked last. This fills in
+        // applications and rankings from the NLP engines for anyone who did
+        // not do it by hand, and leaves every manual choice alone.
+        require_once __DIR__ . '/auto_ranking.php';
+        $this->lastRankingSummary = applyRecommendationDefaults($this->db, (int)$cycle['id']);
+
         $matchResult = EngineRunner::run('matching', ['cycle-id' => (int)$cycle['id']]);
         if ($matchResult['success'] && !empty($matchResult['data']['round_id'])) {
             EngineRunner::run('stability_verifier',
@@ -380,6 +402,15 @@ class CycleStateMachine
 
     private function notify(int $userId, string $title, string $message, string $type, string $link): void
     {
+        // The links handed in above are app-relative ('/applications.php').
+        // The app does not live at the web root — BASE_URL is '/Internship' —
+        // so a bare path sends the "Go" button to localhost/applications.php
+        // and 404s. Every other page in the project already prefixes BASE_URL;
+        // doing it here fixes all the cycle notifications in one place.
+        if ($link !== '' && strpos($link, BASE_URL . '/') !== 0 && $link[0] === '/') {
+            $link = BASE_URL . $link;
+        }
+
         $stmt = $this->db->prepare("
             INSERT INTO notifications (user_id, title, message, type, link, is_read, created_at)
             VALUES (?, ?, ?, ?, ?, 0, NOW())

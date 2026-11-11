@@ -49,11 +49,19 @@ if ($studentId) {
     }
 }
 
+// "Already applied" means applied IN THIS CYCLE. Applications used to carry no
+// cycle at all, so an application made in an earlier cycle made the offer look
+// already applied for in every cycle after it.
+$cycleId = activeCycleId($db);
+
 $alreadyApplied = false;
 $existing = null;
 if ($studentId) {
-    $stmt = $db->prepare("SELECT id, status FROM applications WHERE student_id = ? AND offer_id = ?");
-    $stmt->execute([$studentId, $offerId]);
+    $stmt = $db->prepare(
+        "SELECT id, status FROM applications
+         WHERE student_id = ? AND offer_id = ? AND cycle_id = ?"
+    );
+    $stmt->execute([$studentId, $offerId, $cycleId]);
     $existing = $stmt->fetch();
     $alreadyApplied = (bool)$existing;
 }
@@ -65,10 +73,14 @@ $canApply = studentsCanApply($db);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $studentId && !$alreadyApplied && $isEligible && $canApply) {
     $coverLetter = trim($_POST['cover_letter'] ?? '');
+    // Stamped with the cycle it was made in, and as 'manual' — the student did
+    // this themselves, so the recommendation engine will not add anything to
+    // their list or replace it.
     $stmt = $db->prepare(
-        "INSERT INTO applications (student_id, offer_id, cover_letter) VALUES (?, ?, ?)"
+        "INSERT INTO applications (student_id, offer_id, cycle_id, source, cover_letter)
+         VALUES (?, ?, ?, 'manual', ?)"
     );
-    $stmt->execute([$studentId, $offerId, $coverLetter]);
+    $stmt->execute([$studentId, $offerId, $cycleId, $coverLetter]);
 
     // Notify the offer poster
     notify(

@@ -54,6 +54,9 @@ def load_offer(cur, offer_id: int) -> Optional[dict]:
 
 
 def load_applicants(cur, offer_id: int) -> list:
+    # Only this cycle's applicants. An offer can stay open across cycles, and
+    # without the cycle filter it would be scored against applicants from an
+    # earlier cycle as well. The subquery mirrors activeCycleId() in PHP.
     cur.execute("""
         SELECT a.id AS application_id, a.status, a.applied_at, a.cover_letter,
                s.id AS student_id, s.matricola, s.program, s.total_cfu,
@@ -63,6 +66,10 @@ def load_applicants(cur, offer_id: int) -> list:
         JOIN students s ON s.id = a.student_id
         JOIN users u ON u.id = s.user_id
         WHERE a.offer_id = %s AND a.status != 'withdrawn'
+          AND a.cycle_id = (
+              SELECT id FROM academic_cycles
+              WHERE is_active = 1 ORDER BY id DESC LIMIT 1
+          )
         ORDER BY a.applied_at ASC
     """, (offer_id,))
     applicants = cur.fetchall()
