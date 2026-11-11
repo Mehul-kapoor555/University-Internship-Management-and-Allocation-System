@@ -2,6 +2,9 @@
 require '../includes/db.php';
 require '../includes/auth.php';
 require '../includes/CycleStateMachine.php';
+// Needed for describeStudentDefaults() / describeOfferRankingDefaults(), which
+// turn the fill-in summary into the line shown after a transition.
+require_once '../includes/auto_ranking.php';
 requireRole(['coordinator']);
 
 $user = currentUser();
@@ -99,6 +102,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = $fsm->attemptTransition((int)$cycle['id'], $transitionKey, (int)$user['id'], $override, $notes);
         if ($result['ok']) {
             $message = 'Moved to: ' . $result['new_state'];
+
+            // Closing applications and closing ranking both generate rows from
+            // the NLP engines. Show what they did, so the fill-in is visible
+            // rather than silent.
+            $ranking = $fsm->lastRankingSummary();
+            if (!empty($ranking)) {
+                $message .= ' — ' . (isset($ranking['students_total'])
+                    ? describeStudentDefaults($ranking)
+                    : describeOfferRankingDefaults($ranking));
+            }
+
             $cycle = $fsm->loadCycle();
         } else {
             $error = $result['reason'];

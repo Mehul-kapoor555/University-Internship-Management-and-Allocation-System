@@ -5,23 +5,37 @@ require_once __DIR__ . '/engine_runner.php';
  * ============================================================================
  * AUTOMATIC APPLICATIONS AND RANKING DEFAULTS
  * ============================================================================
- * Makes sure that, for the cycle being matched:
+ * Fills in whatever a human did not do, so that nothing is ever missing when
+ * the matcher runs. Split into two phases that fire at two different points of
+ * the cycle:
  *
- *   - every active student has applications,
- *   - every student with applications has a ranked preference list,
- *   - every offer with applicants has them ALL ranked.
+ *   applyStudentDefaults()       fires when APPLICATIONS CLOSE
+ *       - students who applied to nothing get AUTO_APPLY_LIMIT applications
+ *       - every student with applications gets a ranked preference list
  *
- * Nothing is left empty, so nothing can be dropped by the matcher.
+ *   applyOfferRankingDefaults()  fires when RANKING CLOSES
+ *       - every offer with applicants gets them ALL ranked
  *
- * Why this exists
- * ---------------
- * The matcher reads ONLY `student_preferences` and `offer_rankings`. The NLP
- * engines write to different tables (`recommendation_scores` and
- * `applicant_rankings`), and the only bridge between them used to be a "load
- * from recommendations" button a human had to click. Anyone who never clicked
- * it had no rows at all, and `load_matching_data()` in the matching engine
- * leaves out a student who has no preference rows - they are not ranked last,
- * they are absent from the allocation entirely.
+ * Why the two phases are split
+ * ----------------------------
+ * The order is not a convenience, it is a correctness requirement.
+ *
+ * Professors and companies rank the students who applied to their offer. So
+ * every application has to EXIST before the ranking window opens. When both
+ * phases ran together just before matching, the applications generated for
+ * students who applied to nothing were created AFTER ranking had already
+ * closed. Those students were invisible to the posters, who ranked only the
+ * manual applicants. And because phase two skips any offer whose poster ranked
+ * by hand, those late applicants were never added to that offer's ranking at
+ * all - so the matcher had no opinion to use when they proposed, and they were
+ * dropped for nothing.
+ *
+ * Generating the applications when applications close fixes that: by the time
+ * the posters are asked to rank, every applicant is on their list.
+ *
+ * It also spreads the work. Each phase runs at the end of its own window
+ * instead of all of it landing on the matching step, and the integrity checks
+ * at each stage now have complete data to check.
  *
  * The rule
  * --------
@@ -69,29 +83,28 @@ if (!defined('AUTO_APPLY_LIMIT')) {
 }
 
 /**
- * Fill in missing applications, preference lists and applicant rankings for
- * one cycle.
+ * PHASE ONE — fires when applications close.
+ *
+ * Gives every active student applications, and every student with applications
+ * a ranked preference list. Runs before the ranking window opens so posters
+ * see every applicant they are supposed to rank.
  *
  * Safe to run repeatedly. Each run refreshes generated rows and leaves manual
- * rows alone, so a coordinator can run matching twice without wiping anyone's
- * choices.
+ * rows alone.
  *
  * @return array Summary for display: what was generated, what was respected.
  */
-function applyRecommendationDefaults(PDO $db, ?int $cycleId): array
+function applyStudentDefaults(PDO $db, ?int $cycleId): array
 {
     $summary = [
-        'students_total'             => 0,
-        'students_applied_themselves'=> 0,
-        'students_auto_applied'      => 0,
-        'students_no_eligible_offers'=> 0,
-        'students_generated'         => 0,
-        'students_manual'            => 0,
-        'students_no_data'           => 0,
-        'offers_generated'           => 0,
-        'offers_manual'              => 0,
-        'offers_no_data'             => 0,
-        'engine_failures'            => [],
+        'students_total'              => 0,
+        'students_applied_themselves' => 0,
+        'students_auto_applied'       => 0,
+        'students_no_eligible_offers' => 0,
+        'students_generated'          => 0,
+        'students_manual'             => 0,
+        'students_no_data'            => 0,
+        'engine_failures'             => [],
     ];
 
     // Without a cycle there is nothing to scope anything to, and writing rows
@@ -257,8 +270,38 @@ function applyRecommendationDefaults(PDO $db, ?int $cycleId): array
         $summary['students_generated']++;
     }
 
+    return $summary;
+}
+
+/**
+ * PHASE TWO — fires when the ranking window closes.
+ *
+ * Gives every offer with applicants a complete ranking of them. Runs after the
+ * posters have had their turn, so a poster who ranked by hand is never
+ * overwritten, and an offer nobody ranked still arrives at the matcher with a
+ * full opinion.
+ *
+ * Safe to run repeatedly.
+ *
+ * @return array Summary for display: what was generated, what was respected.
+ */
+function applyOfferRankingDefaults(PDO $db, ?int $cycleId): array
+{
+    $summary = [
+        'offers_total'     => 0,
+        'offers_generated' => 0,
+        'offers_manual'    => 0,
+        'offers_no_data'   => 0,
+        'engine_failures'  => [],
+    ];
+
+    if ($cycleId === null) {
+        $summary['engine_failures'][] = 'No active cycle — nothing was generated.';
+        return $summary;
+    }
+
     // ------------------------------------------------------------------
-    // STEP 3 — offers -> offer_rankings (every applicant, not a top few)
+    // Offers -> offer_rankings (every applicant, not a top few)
     // ------------------------------------------------------------------
     $offers = $db->prepare("
         SELECT DISTINCT o.id
@@ -269,6 +312,8 @@ function applyRecommendationDefaults(PDO $db, ?int $cycleId): array
     ");
     $offers->execute([$cycleId]);
     $offers = $offers->fetchAll();
+
+    $summary['offers_total'] = count($offers);
 
     $hasManualRank = $db->prepare("
         SELECT COUNT(*) FROM offer_rankings
@@ -309,8 +354,8 @@ function applyRecommendationDefaults(PDO $db, ?int $cycleId): array
         }
 
         // The applicant-ranking engine scores this offer's applicants. It runs
-        // here if it has never run for this offer. New applicants added after
-        // that are still ranked — they fall in by application order below.
+        // here if it has never run for this offer. Applicants added after that
+        // are still ranked — they fall in by application order below.
         $countApplicantRanks->execute([$offerId]);
         if ((int)$countApplicantRanks->fetchColumn() === 0) {
             $res = EngineRunner::run('applicant_ranking', ['offer-id' => $offerId]);
@@ -339,8 +384,8 @@ function applyRecommendationDefaults(PDO $db, ?int $cycleId): array
     return $summary;
 }
 
-/** One-line human summary of what applyRecommendationDefaults() did. */
-function describeRecommendationDefaults(array $s): string
+/** One-line human summary of what applyStudentDefaults() did. */
+function describeStudentDefaults(array $s): string
 {
     $parts = [];
     $parts[] = $s['students_total'] . ' student(s) checked';
@@ -348,8 +393,6 @@ function describeRecommendationDefaults(array $s): string
     if ($s['students_auto_applied'])       $parts[] = $s['students_auto_applied'] . ' had ' . AUTO_APPLY_LIMIT . ' application(s) generated';
     $parts[] = $s['students_generated'] . ' preference list(s) generated';
     if ($s['students_manual'])             $parts[] = $s['students_manual'] . ' kept as manually ranked';
-    $parts[] = $s['offers_generated'] . ' offer ranking(s) generated';
-    if ($s['offers_manual'])               $parts[] = $s['offers_manual'] . ' kept as manually ranked';
 
     $text = implode(', ', $parts) . '.';
 
@@ -362,6 +405,27 @@ function describeRecommendationDefaults(array $s): string
     if ($s['students_no_data']) {
         $text .= ' ' . $s['students_no_data']
               . ' student(s) had applications but no open offer left to rank.';
+    }
+    if (!empty($s['engine_failures'])) {
+        $text .= ' ' . count($s['engine_failures']) . ' engine call(s) failed.';
+    }
+
+    return $text;
+}
+
+/** One-line human summary of what applyOfferRankingDefaults() did. */
+function describeOfferRankingDefaults(array $s): string
+{
+    $parts = [];
+    $parts[] = $s['offers_total'] . ' offer(s) with applicants checked';
+    $parts[] = $s['offers_generated'] . ' ranking(s) generated';
+    if ($s['offers_manual'])  $parts[] = $s['offers_manual'] . ' kept as manually ranked';
+    if ($s['offers_no_data']) $parts[] = $s['offers_no_data'] . ' had no applicants left to rank';
+
+    $text = implode(', ', $parts) . '.';
+
+    if (!empty($s['engine_failures'])) {
+        $text .= ' ' . count($s['engine_failures']) . ' engine call(s) failed.';
     }
 
     return $text;

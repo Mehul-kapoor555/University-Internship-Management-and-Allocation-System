@@ -44,7 +44,11 @@ return [
                 'target' => 'APPLICATIONS_INTEGRITY',
                 'label' => 'Close applications',
                 'requires' => [],
-                'on_transition' => 'action_notify_coordinator_apps_closed',
+                // Closing applications is also where the recommendation engine
+                // fills in for students who did not apply or did not rank. It
+                // has to happen here, before the ranking window opens, so the
+                // posters see every applicant they are meant to rank.
+                'on_transition' => 'action_close_applications',
             ],
             'cancel' => [
                 'target' => 'CANCELLED',
@@ -92,7 +96,10 @@ return [
                 'target' => 'RANKING_INTEGRITY',
                 'label' => 'Close ranking',
                 'requires' => [],
-                'on_transition' => 'action_notify_coordinator_ranking_closed',
+                // Closing ranking is also where any offer the poster did not
+                // rank gets a full ranking from the NLP scores, so every offer
+                // reaches the matcher with an opinion on all its applicants.
+                'on_transition' => 'action_close_ranking',
             ],
         ],
     ],

@@ -23,9 +23,10 @@ class CycleStateMachine
     private IntegrityChecker $checker;
 
     /**
-     * What the automatic application/ranking fill-in did on the last matching
-     * run. Kept so Cycle control can show it instead of the work happening
-     * invisibly. Empty until action_run_matching_engine has run.
+     * What the automatic fill-in did on the transition that just ran. Set by
+     * action_close_applications (student applications and preference lists) and
+     * by action_close_ranking (offer rankings), so Cycle control can show the
+     * work instead of it happening invisibly. Empty on any other transition.
      */
     private array $lastRankingSummary = [];
 
@@ -194,11 +195,27 @@ class CycleStateMachine
             'info', '/internships.php');
     }
 
-    private function action_notify_coordinator_apps_closed(array $cycle): void
+    private function action_close_applications(array $cycle): void
     {
+        // Phase one of the automatic fill-in. Students who applied to nothing
+        // get applications generated for them, and everyone with applications
+        // gets a ranked preference list.
+        //
+        // This has to happen HERE and not at matching time. Professors and
+        // companies rank the students who applied to their offer, so every
+        // application must exist before the ranking window opens. When this ran
+        // just before matching, generated applications appeared after ranking
+        // had already closed: the posters never saw those students, and an
+        // offer ranked by hand was then skipped by the fill-in, so those
+        // students reached the matcher with no opinion against them and were
+        // dropped for nothing.
+        require_once __DIR__ . '/auto_ranking.php';
+        $this->lastRankingSummary = applyStudentDefaults($this->db, (int)$cycle['id']);
+
         $this->notifyAllOfRole('coordinator',
             'Applications closed',
-            'The application window for "' . $cycle['name'] . '" has closed. Ready to review.',
+            'The application window for "' . $cycle['name'] . '" has closed. '
+                . 'Preference lists are ready. ' . describeStudentDefaults($this->lastRankingSummary),
             'info', '/admin/cycle-control.php');
     }
 
@@ -214,25 +231,34 @@ class CycleStateMachine
             'action', '/professor/rank-applicants.php');
     }
 
-    private function action_notify_coordinator_ranking_closed(array $cycle): void
+    private function action_close_ranking(array $cycle): void
     {
+        // Phase two of the automatic fill-in. Any offer whose poster did not
+        // rank gets a full ranking of all its applicants from the NLP scores.
+        // Runs after the posters have had their turn, so a hand-made ranking is
+        // never overwritten, and every offer still reaches the matcher with an
+        // opinion on everyone who applied to it.
+        require_once __DIR__ . '/auto_ranking.php';
+        $this->lastRankingSummary = applyOfferRankingDefaults($this->db, (int)$cycle['id']);
+
         $this->notifyAllOfRole('coordinator',
             'Ranking closed',
-            'The ranking window for "' . $cycle['name'] . '" has closed. Ready to review before matching.',
+            'The ranking window for "' . $cycle['name'] . '" has closed. '
+                . 'Offer rankings are ready. ' . describeOfferRankingDefaults($this->lastRankingSummary),
             'info', '/admin/cycle-control.php');
     }
 
     private function action_run_matching_engine(array $cycle): void
     {
-        // Before the matcher runs, make sure nobody is missing the rows it
-        // reads. The matcher only looks at student_preferences and
-        // offer_rankings, and a student with no preference rows is left out of
-        // the allocation entirely rather than ranked last. This fills in
-        // applications and rankings from the NLP engines for anyone who did
-        // not do it by hand, and leaves every manual choice alone.
-        require_once __DIR__ . '/auto_ranking.php';
-        $this->lastRankingSummary = applyRecommendationDefaults($this->db, (int)$cycle['id']);
-
+        // Nothing is generated here any more. Preference lists were built when
+        // applications closed (action_close_applications) and offer rankings
+        // when ranking closed (action_close_ranking), so by this point every
+        // row the matcher reads already exists. Generating at this point was
+        // too late to be useful to the posters — see action_close_applications.
+        //
+        // If the matcher reports students it could not see, the check to run is
+        // whether those two actions fired: matching_engine.py returns
+        // applied_but_unranked for exactly that reason.
         $matchResult = EngineRunner::run('matching', ['cycle-id' => (int)$cycle['id']]);
         if ($matchResult['success'] && !empty($matchResult['data']['round_id'])) {
             EngineRunner::run('stability_verifier',
